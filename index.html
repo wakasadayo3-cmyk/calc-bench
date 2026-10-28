@@ -1,0 +1,1033 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>機械設計 計算ベンチ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="theme-color" content="#1c3d9e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="計算ベンチ">
+<meta name="apple-mobile-web-app-status-bar-style" content="default"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: drawing title-block header → category tabs → calculator pills → inputs | results (stacked on phone) */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --surface-2:#f6f8fa; --ink:#15202b; --muted:#5a6775; --line:#d3dae2; --line-strong:#15202b;
+  --accent:#1c3d9e; --accent-soft:#e3e9f8; --accent-ink:#ffffff;
+  --metal:#cdd5de; --liq:#cfe0f6; --ok:#17794a; --ok-bg:#e1f3e9; --warn:#9a6200; --warn-bg:#fbf0d9; --ng:#b3261e; --ng-bg:#fbe4e2;
+  --sans:"IBM Plex Sans JP",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1318; --surface:#151c23; --surface-2:#1a222b; --ink:#e4eaf0; --muted:#94a2b1; --line:#2a3541; --line-strong:#8ea0b4;
+  --accent:#86a2ff; --accent-soft:#1d2a4d; --accent-ink:#0e1318;
+  --metal:#364250; --liq:#1c3352; --ok:#5fd39a; --ok-bg:#123325; --warn:#f0b54d; --warn-bg:#3a2b0e; --ng:#ff8a80; --ng-bg:#3d1714; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0e1318; --surface:#151c23; --surface-2:#1a222b; --ink:#e4eaf0; --muted:#94a2b1; --line:#2a3541; --line-strong:#8ea0b4;
+  --accent:#86a2ff; --accent-soft:#1d2a4d; --accent-ink:#0e1318;
+  --metal:#364250; --liq:#1c3352; --ok:#5fd39a; --ok-bg:#123325; --warn:#f0b54d; --warn-bg:#3a2b0e; --ng:#ff8a80; --ng-bg:#3d1714; color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+.wrap{max-width:1320px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:16px}
+
+/* title block */
+.tb{display:grid;grid-template-columns:2.2fr 1fr 1fr 0.7fr;border:1.5px solid var(--line-strong);background:var(--surface)}
+.tb>div{padding:8px 12px;border-left:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;min-width:0}
+.tb>div:first-child{border-left:0}
+.tb-k{font-size:11px;letter-spacing:.08em;color:var(--muted)}
+.tb h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.02em;line-height:1.3;text-wrap:balance}
+.tb .val{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:720px){
+  .tb{grid-template-columns:repeat(3,1fr)}
+  .tb>div:first-child{grid-column:1/-1;border-bottom:1px solid var(--line)}
+  .tb>div:nth-child(2){border-left:0}
+  .tb h1{font-size:19px}
+}
+
+/* category tabs */
+.cats{display:flex;gap:4px;overflow-x:auto;border-bottom:1.5px solid var(--line-strong);scrollbar-width:none}
+.cats::-webkit-scrollbar{display:none}
+.cat{appearance:none;border:0;background:none;font:inherit;font-weight:600;color:var(--muted);padding:10px 14px;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-1.5px}
+.cat:hover{color:var(--ink)}
+.cat[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.cat:focus-visible,.pill:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+[hidden]{display:none!important}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{appearance:none;font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 12px;border-radius:999px;cursor:pointer}
+.pill:hover{border-color:var(--accent)}
+.pill[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+
+/* panel */
+.panel{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.panel{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);padding:18px;min-width:0}
+.head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.head h2{margin:0;font-size:19px;line-height:1.35;text-wrap:balance}
+.desc{margin:4px 0 14px;color:var(--muted);font-size:13.5px}
+.btn{appearance:none;font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);padding:4px 10px;cursor:pointer;white-space:nowrap}
+.btn:hover{color:var(--ink);border-color:var(--muted)}
+
+.grid{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.field{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,190px);align-items:center;gap:6px 14px;padding:7px 0;border-bottom:1px dashed var(--line);min-width:0}
+.field.sel{grid-template-columns:minmax(0,.8fr) minmax(0,1.5fr)}
+.field label{font-size:14px;color:var(--ink);font-weight:500;line-height:1.45}
+.ctl{display:flex;align-items:stretch;border:1px solid var(--line);background:var(--surface-2);min-width:0}
+.ctl:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.ctl input,.ctl select{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;padding:8px 10px;outline:none}
+.ctl input{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums;text-align:right}
+.ctl select{cursor:pointer;font-size:14px}
+.ctl select option{background:var(--surface);color:var(--ink)}
+.ctl input.bad{color:var(--ng)}
+.unit{display:flex;align-items:center;padding:0 10px;font-family:var(--mono);font-size:12.5px;color:var(--muted);border-left:1px solid var(--line);white-space:nowrap}
+
+.lbl{margin:0 0 10px;font-size:11.5px;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.mains{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.m{background:var(--surface-2);border:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.m .k{font-size:12px;color:var(--muted)}
+.m .v{font-family:var(--mono);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 6px;overflow-wrap:anywhere}
+.m .u{font-size:13px;font-weight:400;color:var(--muted)}
+.m[data-st="ok"]{border-color:var(--ok)} .m[data-st="warn"]{border-color:var(--warn)} .m[data-st="ng"]{border-color:var(--ng)}
+.rows{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.r{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.r .k{font-size:13.5px;color:var(--muted);min-width:0}
+.r .v{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;display:flex;align-items:baseline;gap:6px}
+.r .u{font-size:12px;color:var(--muted)}
+.chip{font-family:var(--sans);font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:999px;align-self:center;letter-spacing:.02em}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.warn{background:var(--warn-bg);color:var(--warn)} .chip.ng{background:var(--ng-bg);color:var(--ng)}
+.fmwrap{margin-top:18px}
+.fm{margin:0;font-family:var(--mono);font-size:13px;line-height:1.75;background:var(--surface-2);border-left:3px solid var(--accent);padding:10px 12px;white-space:pre-wrap;overflow-x:auto;color:var(--ink)}
+.note{margin:12px 0 0;font-size:13px;color:var(--warn);background:var(--warn-bg);padding:8px 12px}
+
+
+/* app layout: sidebar list | calc */
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);gap:20px;align-items:start}
+.mainc{display:flex;flex-direction:column;gap:14px;min-width:0}
+.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px - env(safe-area-inset-top,0px));overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px}
+.srch input{font-family:var(--sans)!important;font-size:13.5px!important;text-align:left!important}
+.ng h3{margin:0 0 4px;font-size:11.5px;letter-spacing:.1em;color:var(--muted);font-weight:600;padding:0 10px}
+.ng ul{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column}
+.nv{appearance:none;width:100%;text-align:left;border:0;border-left:3px solid transparent;background:none;font:inherit;font-size:13.5px;line-height:1.4;color:var(--ink);padding:6px 10px 6px 9px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.nv:hover{background:var(--surface)}
+.nv[aria-current="page"]{background:var(--surface);border-left-color:var(--accent);color:var(--accent);font-weight:600}
+.nv:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.nv .bd{flex:none;padding:0 6px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-family:var(--mono);font-size:11px;font-weight:600}
+.nohit{margin:0;font-size:13px;color:var(--muted);padding:0 10px}
+.picker{display:none}
+.picker label{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.06em}
+.picker select{font-weight:600!important;font-size:15px!important}
+.chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:2px 2px 0}
+.chead-t{min-width:0;flex:1}
+.crumb{margin:0;font-size:12px;color:var(--accent);font-weight:600;letter-spacing:.06em}
+.chead h2{margin:2px 0 0;font-size:24px;line-height:1.3;text-wrap:balance}
+.chead .desc{margin:4px 0 0;max-width:62ch}
+@media (max-width:1100px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{display:none}
+  .picker{display:flex;flex-direction:column;gap:4px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:8px 0}
+}
+@media (max-width:520px){
+  .field{grid-template-columns:minmax(0,1fr) minmax(0,150px)}
+  .field.sel{grid-template-columns:minmax(0,1fr)}
+  .field.sel label{font-size:13px;color:var(--muted)}
+  .chead h2{font-size:20px}
+}
+.fig svg{max-height:230px}
+/* contour view: a deliberately dark "solver" panel in both themes */
+.viz{display:flex;flex-direction:column;gap:8px;margin:0 0 16px}
+.viz-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.viz-head .lbl{margin:0}
+.seg{display:inline-flex;border:1px solid var(--line);background:var(--surface-2)}
+.seg button{appearance:none;border:0;background:none;font:inherit;font-size:12.5px;padding:5px 14px;color:var(--muted);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+#vizcv{display:block;width:100%;border-radius:10px;background:#101a2b}
+.viz-note{margin:0;font-size:12.5px;color:var(--muted)}
+/* figure */
+.fig{margin:0 0 16px;background:var(--surface-2);border:1px solid var(--line);padding:10px 12px 8px;display:flex;flex-direction:column;gap:4px}
+.fig svg{display:block;width:100%;max-width:440px;height:auto;margin:0 auto;overflow:visible}
+.fig figcaption{font-size:12px;color:var(--muted)}
+.dg{color:var(--ink)}
+.dg .s{fill:none;stroke:currentColor;stroke-width:1.5}
+.dg .f{fill:var(--surface);stroke:currentColor;stroke-width:1.5}
+.dg .fm{fill:var(--metal);stroke:currentColor;stroke-width:1.5}
+.dg .bg{fill:var(--surface-2);stroke:currentColor;stroke-width:1.5}
+.dg .lq{fill:var(--liq);stroke:none}
+.dg .pp{fill:none;stroke:currentColor;stroke-width:4;stroke-linejoin:round}
+.dg .pw{fill:none;stroke:currentColor;stroke-width:44;stroke-linejoin:round}
+.dg .pi{fill:none;stroke:var(--liq);stroke-width:36;stroke-linejoin:round}
+.dg .a{fill:none;stroke:var(--accent);stroke-width:2}
+.dg .ahd{fill:var(--accent)}
+.dg .d{fill:none;stroke:var(--muted);stroke-width:1}
+.dg .dhd{fill:var(--muted)}
+.dg .h{stroke:var(--muted);stroke-width:1}
+.dg .c{fill:none;stroke:var(--muted);stroke-width:1;stroke-dasharray:9 3 2 3}
+.dg .hid{fill:none;stroke:currentColor;stroke-width:1;stroke-dasharray:4 3}
+.dg .dfl{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 4}
+.dg text{font-family:var(--mono),var(--sans);font-size:12px;fill:currentColor}
+.dg text.ta{fill:var(--accent);font-weight:600}
+.dg text.tm{fill:var(--muted);font-size:11.5px}
+
+/* records */
+.recs{margin-top:18px;border-top:1.5px solid var(--line-strong);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.rec-head{display:flex;align-items:baseline;gap:10px}
+.rec-head .lbl{margin:0}
+.rec-count{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.rec-bar{display:flex;gap:8px}
+.rec-bar .ctl{flex:1}
+.rec-bar input{font-family:var(--sans)!important;font-size:14px!important;text-align:left!important}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600;font-size:13.5px;padding:6px 16px}
+.btn.pri:hover{color:var(--accent-ink);opacity:.9}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.arm{color:var(--ng);border-color:var(--ng);background:var(--ng-bg)}
+.rec-msg{margin:0;font-size:12.5px;color:var(--muted);min-height:1em}
+.rec-msg:empty{display:none}
+.reclist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto}
+.rec{border:1px solid var(--line);background:var(--surface-2);padding:8px 10px;min-width:0}
+.rec-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.rec-n{font-weight:600;overflow-wrap:anywhere}
+.rec-t{font-size:11.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.x{margin-left:auto;appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-size:17px;line-height:1;cursor:pointer;padding:0 4px}
+.x:hover{color:var(--ng)}
+.x:focus-visible{outline:2px solid var(--accent)}
+.rec-m{display:flex;flex-wrap:wrap;gap:2px 16px;font-size:13px;margin-top:2px}
+.rec-m .k{color:var(--muted)}
+.rec-m b{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.rec-m .chip{margin-left:4px}
+.rec details{margin-top:4px}
+.rec summary{font-size:12px;color:var(--muted);cursor:pointer}
+.rec-d{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;margin:6px 0 2px;font-size:12.5px}
+.rec-d dt{color:var(--muted);min-width:0}
+.rec-d dd{margin:0;font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.rec-d .sep{grid-column:1/-1;font-size:11px;letter-spacing:.1em;font-weight:600;color:var(--muted);border-top:1px dashed var(--line);padding-top:4px;margin-top:2px}
+.rec-d .sep:first-child{border-top:0;padding-top:0;margin-top:0}
+.rec-empty{margin:0;font-size:13px;color:var(--muted);background:var(--surface-2);border:1px dashed var(--line);padding:10px 12px}
+.rec-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.recfb{width:100%;min-height:90px;font-family:var(--mono);font-size:12px;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);padding:6px}
+.pill .bd{display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-family:var(--mono);font-size:11.5px;font-weight:600}
+.pill[aria-pressed="true"] .bd{background:var(--accent-ink);color:var(--accent)}
+sup{font-size:.65em}
+footer{color:var(--muted);font-size:12.5px;line-height:1.7;border-top:1px solid var(--line);padding-top:12px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="tb">
+    <div><span class="tb-k">名称</span><h1>機械設計 計算ベンチ</h1></div>
+    <div><span class="tb-k">単位系</span><span class="val">N・mm・MPa</span></div>
+    <div><span class="tb-k">重力加速度</span><span class="val">g = 9.80665</span></div>
+    <div><span class="tb-k">計算数</span><span class="val" id="count"></span></div>
+  </header>
+
+  <div class="app">
+  <aside class="side" aria-label="計算の一覧">
+    <div class="ctl srch"><input id="q" type="search" placeholder="計算を検索（例：トルク）" autocomplete="off" aria-label="計算を検索"></div>
+    <nav id="nav"></nav>
+    <p class="nohit" id="nohit" hidden>該当する計算がありません。</p>
+  </aside>
+  <div class="mainc">
+  <div class="picker"><label for="pick">計算を選ぶ</label><div class="ctl"><select id="pick"></select></div></div>
+  <div class="chead">
+    <div class="chead-t"><p class="crumb" id="ccat"></p><h2 id="ctitle"></h2><p class="desc" id="cdesc"></p></div>
+    <button class="btn" id="reset" type="button">初期値に戻す</button>
+  </div>
+  <main class="panel">
+    <section class="card">
+      <figure class="fig" id="fig" hidden><div id="figsvg"></div><figcaption>図中の記号は入力欄・計算式の記号と対応しています。</figcaption></figure>
+      <h3 class="lbl">入力</h3>
+      <form id="form" class="grid" autocomplete="off"></form>
+    </section>
+    <section class="card results" aria-live="polite">
+      <h3 class="lbl">計算結果</h3>
+      <div id="res"></div>
+      <div class="viz" id="viz" hidden>
+        <div class="viz-head"><h3 class="lbl">変形図（コンター）</h3><div class="seg" id="vizseg" role="group" aria-label="表示する量"></div></div>
+        <canvas id="vizcv" role="img" aria-label="変形とコンターの図"></canvas>
+        <p class="viz-note" id="viznote"></p>
+      </div>
+      <div id="resrows"></div>
+      <div class="fmwrap" id="fmwrap"><h3 class="lbl">使用した式</h3><pre class="fm" id="fm"></pre></div>
+      <p class="note" id="note" hidden></p>
+      <div class="recs">
+        <div class="rec-head"><h3 class="lbl">記録</h3><span class="rec-count" id="reccount"></span></div>
+        <div class="rec-bar"><div class="ctl"><input id="recname" type="text" maxlength="40" placeholder="名前（例：タンク1）" autocomplete="off"></div><button class="btn pri" id="recadd" type="button">記録する</button></div>
+        <p class="rec-msg" id="recmsg" aria-live="polite"></p>
+        <ol class="reclist" id="reclist"></ol>
+        <textarea id="recfb" class="recfb" readonly hidden aria-label="コピー用の表"></textarea>
+        <div class="rec-foot"><button class="btn" id="reccopy" type="button">表としてコピー</button><button class="btn" id="recclr" type="button">記録を初期化</button></div>
+      </div>
+    </section>
+  </main>
+  </div>
+  </div>
+
+  <footer>
+    入力すると即座に再計算します。入力値と記録はこのブラウザに保存されます（別の端末やブラウザには引き継がれません）。<br>
+    材料の強度・弾性係数は代表値（目安）です。最終判断は規格値・メーカー値、応力集中・疲労・組合せ応力の検討とあわせて行ってください。
+  </footer>
+</div>
+
+<script>
+(function(){
+const g=9.80665, PI=Math.PI;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- data ---------- */
+const MATS={
+  ss400:{n:'SS400 一般構造用圧延鋼',rho:7.85,E:206,sy:245,su:400},
+  s45c:{n:'S45C 炭素鋼（焼ならし）',rho:7.85,E:205,sy:345,su:570},
+  scm435:{n:'SCM435 クロモリ鋼（調質）',rho:7.85,E:206,sy:785,su:930},
+  sus304:{n:'SUS304 ステンレス',rho:7.93,E:193,sy:205,su:520},
+  a5052:{n:'A5052-H34 アルミ',rho:2.68,E:70,sy:175,su:235},
+  a6061:{n:'A6061-T6 アルミ',rho:2.70,E:69,sy:245,su:265},
+  a7075:{n:'A7075-T6 超々ジュラルミン',rho:2.80,E:72,sy:500,su:570},
+  fc250:{n:'FC250 ねずみ鋳鉄',rho:7.3,E:110,sy:null,su:250},
+  c3604:{n:'C3604 快削黄銅',rho:8.5,E:100,sy:null,su:335},
+  c1100:{n:'C1100 タフピッチ銅',rho:8.89,E:118,sy:null,su:195},
+  pom:{n:'POM（ポリアセタール）',rho:1.41,E:2.8,sy:62,su:62},
+  mc:{n:'MCナイロン',rho:1.16,E:3.4,sy:null,su:90},
+  custom:{n:'その他（手入力）'}
+};
+const FLUIDS={
+  w20:{n:'水（20℃）',rho:998,nu:1.004}, w60:{n:'水（60℃）',rho:983,nu:0.475},
+  vg32:{n:'作動油 VG32（40℃）',rho:860,nu:32}, vg46:{n:'作動油 VG46（40℃）',rho:870,nu:46},
+  air:{n:'空気（20℃・大気圧）',rho:1.205,nu:15.1}, custom:{n:'その他（手入力）'}
+};
+const LIQ={w:{n:'水',rho:1.0},oil:{n:'作動油',rho:0.87},ds:{n:'軽油',rho:0.83},gs:{n:'ガソリン',rho:0.75},custom:{n:'その他（手入力）'}};
+const SGP=[['6A',6.5],['8A',9.2],['10A',12.7],['15A',16.1],['20A',21.6],['25A',27.6],['32A',35.7],['40A',41.6],['50A',52.9],['65A',67.9],['80A',80.7],['100A',105.3],['125A',130.8],['150A',155.2]];
+const BOLTS={M3:[3,5.03],M4:[4,8.78],M5:[5,14.2],M6:[6,20.1],M8:[8,36.6],M10:[10,58.0],M12:[12,84.3],M14:[14,115],M16:[16,157],M20:[20,245],M24:[24,353],M30:[30,561]};
+const GRADES={'4.8':[340,420],'8.8':[640,800],'10.9':[940,1040],'12.9':[1100,1220],'A2-70':[450,700]};
+const UNITS={
+  len:{n:'長さ',u:[['m',1],['mm',1e-3],['cm',1e-2],['μm',1e-6],['in',0.0254],['ft',0.3048]]},
+  mass:{n:'質量',u:[['kg',1],['g',1e-3],['t',1000],['lb',0.45359237]]},
+  force:{n:'力',u:[['N',1],['kN',1000],['kgf',g],['tf',g*1000],['lbf',4.4482216]]},
+  pres:{n:'圧力・応力',u:[['MPa',1e6],['kPa',1e3],['Pa',1],['bar',1e5],['kgf/cm²',98066.5],['atm',101325],['psi',6894.757],['mmHg',133.322]]},
+  torque:{n:'トルク',u:[['N·m',1],['N·mm',1e-3],['kgf·m',g],['kgf·cm',g/100],['lbf·ft',1.355818],['lbf·in',0.1129848]]},
+  power:{n:'動力',u:[['kW',1000],['W',1],['PS',735.49875],['HP',745.6999]]},
+  flow:{n:'流量',u:[['L/min',1/60000],['L/s',1e-3],['m³/h',1/3600],['m³/s',1],['cc/min',1e-6/60],['GPM(US)',3.785411784e-3/60]]},
+  speed:{n:'速度',u:[['m/s',1],['m/min',1/60],['mm/s',1e-3],['km/h',1/3.6]]}
+};
+
+/* ---------- helpers ---------- */
+const SH=[['round','丸棒（中実）'],['pipe','丸パイプ'],['rect','角材・平板'],['sq','角パイプ']];
+const on=(k,...vals)=>v=>vals.includes(v[k]);
+function secFields(def,dims){dims=dims||{};return[
+  {id:'sh',l:'断面形状',opt:SH,v:def||'round'},
+  {id:'d',l:v=>v.sh==='pipe'?'外径 D':'直径 d',u:'mm',v:dims.d??30,show:on('sh','round','pipe')},
+  {id:'b',l:'幅 b',u:'mm',v:dims.b??20,show:on('sh','rect','sq')},
+  {id:'h',l:'高さ h（荷重方向）',u:'mm',v:dims.h??40,show:on('sh','rect','sq')},
+  {id:'t',l:'肉厚 t',u:'mm',v:dims.t??3,show:on('sh','pipe','sq')}
+];}
+function section(v){
+  const {d,b,h,t}=v;
+  if(v.sh==='round'){const I=PI*d**4/64;return{A:PI*d*d/4,I,Imin:I,c:d/2,f:'A = π·d²/4,  I = π·d⁴/64'};}
+  if(v.sh==='pipe'){const di=d-2*t;if(!(di>=0))return null;const I=PI*(d**4-di**4)/64;return{A:PI*(d*d-di*di)/4,I,Imin:I,c:d/2,f:'A = π(D² − d₁²)/4,  I = π(D⁴ − d₁⁴)/64   (d₁ = D − 2t)'};}
+  if(v.sh==='rect'){const I=b*h**3/12;return{A:b*h,I,Imin:Math.min(I,h*b**3/12),c:h/2,f:'A = b·h,  I = b·h³/12'};}
+  const bi=b-2*t,hi=h-2*t;if(!(bi>=0&&hi>=0))return null;
+  const I=(b*h**3-bi*hi**3)/12,I2=(h*b**3-hi*bi**3)/12;
+  return{A:b*h-bi*hi,I,Imin:Math.min(I,I2),c:h/2,f:'A = b·h − b₁·h₁,  I = (b·h³ − b₁·h₁³)/12   (b₁ = b−2t, h₁ = h−2t)'};
+}
+function matFields(def,o){o=o||{};const cu=v=>v.mat==='custom';return[
+  {id:'mat',l:'材料',opt:Object.entries(MATS).map(([k,m])=>[k,m.n]),v:def||'ss400'},
+  o.rho&&{id:'rho',l:'密度 ρ',u:'g/cm³',v:7.85,show:cu},
+  o.E&&{id:'E',l:'縦弾性係数 E',u:'GPa',v:206,show:cu},
+  o.sy&&{id:'sy',l:'降伏点 σy',u:'MPa',v:245,show:cu}
+].filter(Boolean);}
+function getMat(v){return v.mat==='custom'?{rho:v.rho,E:v.E,sy:v.sy,su:v.sy,n:'手入力'}:MATS[v.mat];}
+function baseStr(m){return m.sy!=null?{s:m.sy,n:'降伏点 σy'}:{s:m.su,n:'引張強さ σB'};}
+function fluidFields(def){return[
+  {id:'fl',l:'流体',opt:Object.entries(FLUIDS).map(([k,f])=>[k,f.n]),v:def||'w20'},
+  {id:'rhoF',l:'密度 ρ',u:'kg/m³',v:1000,show:on('fl','custom')},
+  {id:'nu',l:'動粘度 ν',u:'mm²/s',v:1,show:on('fl','custom')}
+];}
+function getFluid(v){return v.fl==='custom'?{rho:v.rhoF,nu:v.nu}:FLUIDS[v.fl];}
+const sft={id:'sft',l:'目標安全率',u:'',v:2};
+function sfst(x,t){return !isFinite(x)?'':x>=t?'ok':x>=1?'warn':'ng';}
+function regime(Re){return !isFinite(Re)?'—':Re<2300?'層流':Re<4000?'遷移域':'乱流';}
+const err=t=>({r:[{k:'入力エラー',t}],f:''});
+const thickErr=()=>err('肉厚 t が大きすぎます');
+
+/* ---------- calculators ---------- */
+const CATS=[{id:'mass',n:'容積・重量'},{id:'flow',n:'流速・流量'},{id:'str',n:'強度'},{id:'mot',n:'運動・速さ'},{id:'unit',n:'単位換算'}];
+const BEAM={
+  cp:{n:'片持ち／先端に集中荷重',M:(F,L)=>F*L,d:(F,L,EI)=>F*L**3/(3*EI),f:'M = F·L\nδ = F·L³ / (3·E·I)'},
+  cw:{n:'片持ち／等分布荷重',M:(W,L)=>W*L/2,d:(W,L,EI)=>W*L**3/(8*EI),f:'M = W·L / 2\nδ = W·L³ / (8·E·I)    W：総荷重'},
+  sp:{n:'両端支持／中央に集中荷重',M:(F,L)=>F*L/4,d:(F,L,EI)=>F*L**3/(48*EI),f:'M = F·L / 4\nδ = F·L³ / (48·E·I)'},
+  sw:{n:'両端支持／等分布荷重',M:(W,L)=>W*L/8,d:(W,L,EI)=>5*W*L**3/(384*EI),f:'M = W·L / 8\nδ = 5·W·L³ / (384·E·I)    W：総荷重'},
+  fp:{n:'両端固定／中央に集中荷重',M:(F,L)=>F*L/8,d:(F,L,EI)=>F*L**3/(192*EI),f:'M = F·L / 8\nδ = F·L³ / (192·E·I)'},
+  fw:{n:'両端固定／等分布荷重',M:(W,L)=>W*L/12,d:(W,L,EI)=>W*L**3/(384*EI),f:'M = W·L / 12\nδ = W·L³ / (384·E·I)    W：総荷重'}
+};
+const ENDS={pp:[1,'両端ピン（K = 1.0）'],ff:[2,'一端固定・他端自由（K = 2.0）'],fp:[0.7,'一端固定・他端ピン（K = 0.7）'],xx:[0.5,'両端固定（K = 0.5）']};
+
+const CALCS=[
+/* ===== 容積・重量 ===== */
+{id:'mass',cat:'mass',n:'部材の体積・質量',d:'形状・寸法・材料から体積と質量を求めます。',
+ in:[
+  {id:'sh',l:'形状',opt:[['box','直方体（板・角棒）'],['round','丸棒'],['pipe','丸パイプ'],['sq','角パイプ'],['hex','六角棒'],['sph','球'],['cone','円錐']],v:'round'},
+  {id:'a',l:'幅 a',u:'mm',v:50,show:on('sh','box','sq')},
+  {id:'b',l:'高さ b',u:'mm',v:30,show:on('sh','box','sq')},
+  {id:'d',l:v=>v.sh==='pipe'?'外径 D':'直径 d',u:'mm',v:40,show:on('sh','round','pipe','sph','cone')},
+  {id:'t',l:'肉厚 t',u:'mm',v:3,show:on('sh','pipe','sq')},
+  {id:'s',l:'二面幅 s',u:'mm',v:22,show:on('sh','hex')},
+  {id:'h',l:'高さ h',u:'mm',v:60,show:on('sh','cone')},
+  {id:'L',l:'長さ L',u:'mm',v:1000,show:on('sh','box','round','pipe','sq','hex')},
+  {id:'qty',l:'個数',u:'個',v:1},
+  ...matFields('ss400',{rho:1})
+ ],
+ calc:v=>{
+  const m=getMat(v);const {a,b,d,t,s,h,L,qty}=v;let A=null,V,f;
+  switch(v.sh){
+   case'box':A=a*b;f='V = a·b·L';break;
+   case'round':A=PI*d*d/4;f='V = π·d²/4 · L';break;
+   case'pipe':if(d-2*t<0)return thickErr();A=PI*(d*d-(d-2*t)**2)/4;f='V = π·(D² − (D−2t)²)/4 · L';break;
+   case'sq':if(a-2*t<0||b-2*t<0)return thickErr();A=a*b-(a-2*t)*(b-2*t);f='V = (a·b − (a−2t)·(b−2t)) · L';break;
+   case'hex':A=Math.sqrt(3)/2*s*s;f='V = (√3 / 2)·s² · L';break;
+   case'sph':V=PI*d**3/6;f='V = π·d³ / 6';break;
+   case'cone':V=PI*d*d*h/12;f='V = π·d²·h / 12';break;
+  }
+  if(A!==null)V=A*L;
+  const cm3=V/1000,kg=cm3*m.rho/1000;
+  const r=[{k:'質量（1個）',v:kg,u:'kg',main:1},{k:`総質量（${qty}個）`,v:kg*qty,u:'kg',main:1},{k:'体積（1個）',v:cm3,u:'cm³'},{k:'体積（1個）',v:cm3/1000,u:'L'}];
+  if(A!==null)r.push({k:'断面積',v:A,u:'mm²'},{k:'単位長さあたり質量',v:A*m.rho/1000,u:'kg/m'});
+  r.push({k:'重量（総、重力）',v:kg*qty*g,u:'N'},{k:'密度',v:m.rho,u:'g/cm³'});
+  return{r,f:f+'\nm = ρ · V'};
+ }},
+{id:'tank',cat:'mass',n:'タンク・容器の容量',d:'液位から液量と液の質量を求めます。横置き円筒の弓形断面にも対応。',
+ in:[
+  {id:'sh',l:'容器形状',opt:[['v','縦置き円筒'],['h','横置き円筒'],['b','角形']],v:'v'},
+  {id:'D',l:'内径 D',u:'mm',v:600,show:on('sh','v','h')},
+  {id:'a',l:'内寸 幅 a',u:'mm',v:500,show:on('sh','b')},
+  {id:'b',l:'内寸 奥行 b',u:'mm',v:400,show:on('sh','b')},
+  {id:'H',l:'内寸 高さ H',u:'mm',v:800,show:on('sh','v','b')},
+  {id:'L',l:'胴長 L',u:'mm',v:1200,show:on('sh','h')},
+  {id:'lv',l:'液位 h（底から）',u:'mm',v:500},
+  {id:'liq',l:'液体',opt:Object.entries(LIQ).map(([k,x])=>[k,x.n]),v:'w'},
+  {id:'rhoL',l:'液の密度',u:'kg/L',v:1,show:on('liq','custom')}
+ ],
+ calc:v=>{
+  const rho=v.liq==='custom'?v.rhoL:LIQ[v.liq].rho;let Vf,Vl,H,f;
+  const cl=x=>Math.min(Math.max(x,0),H);
+  if(v.sh==='v'){const A=PI*v.D**2/4;H=v.H;Vf=A*H;Vl=A*cl(v.lv);f='V = π·D²/4 · h';}
+  else if(v.sh==='h'){const r=v.D/2;H=v.D;const hh=cl(v.lv);const As=r*r*Math.acos((r-hh)/r)-(r-hh)*Math.sqrt(Math.max(2*r*hh-hh*hh,0));Vf=PI*r*r*v.L;Vl=As*v.L;f='弓形面積 A = r²·cos⁻¹((r − h)/r) − (r − h)·√(2r·h − h²)\nV = A · L';}
+  else{H=v.H;Vf=v.a*v.b*H;Vl=v.a*v.b*cl(v.lv);f='V = a·b·h';}
+  const Lf=Vf/1e6,Ll=Vl/1e6;
+  return{r:[{k:'液量',v:Ll,u:'L',main:1},{k:'液の質量',v:Ll*rho,u:'kg',main:1},{k:'満水容量',v:Lf,u:'L'},{k:'充填率',v:Ll/Lf*100,u:'%'},{k:'液量',v:Ll/1000,u:'m³'}],f,
+   note:v.lv>H?'液位が容器の高さを超えているため、満水として計算しています。':''};
+ }},
+
+/* ===== 流速・流量 ===== */
+{id:'vel',cat:'flow',n:'配管内の流速',d:'流量と管内径から平均流速とレイノルズ数を求めます。',
+ in:[{id:'Q',l:'流量 Q',u:'L/min',v:20},{id:'d',l:'管内径 d',u:'mm',v:12.7},...fluidFields('vg32')],
+ calc:v=>{
+  const fl=getFluid(v);const A=PI*v.d**2/4;const q=v.Q/60000;const vel=q/(A*1e-6);const Re=vel*(v.d/1000)/(fl.nu*1e-6);
+  return{r:[{k:'平均流速 v',v:vel,u:'m/s',main:1},{k:'レイノルズ数 Re',v:Re,main:1},{k:'流れの状態',t:regime(Re)},{k:'流路断面積',v:A,u:'mm²'},{k:'流量',v:q*3600,u:'m³/h'}],
+   f:'v = Q / A,   A = π·d² / 4\nRe = v·d / ν    (Re < 2300 層流 / > 4000 乱流)',
+   note:'流速の目安　油圧：吸込 0.5〜1.5 m/s、圧力 3〜5 m/s、戻り 1.5〜3 m/s　／　給水：1〜2 m/s'};
+ }},
+{id:'pipesize',cat:'flow',n:'必要な管内径',d:'流量と目標流速から必要内径を出し、SGP（配管用炭素鋼鋼管）の呼び径を提案します。',
+ in:[{id:'Q',l:'流量 Q',u:'L/min',v:100},{id:'vt',l:'目標流速 v',u:'m/s',v:2}],
+ calc:v=>{
+  const q=v.Q/60000;const d=Math.sqrt(4*q/(PI*v.vt))*1000;
+  const s=SGP.find(x=>x[1]>=d);
+  const r=[{k:'必要内径',v:d,u:'mm',main:1}];
+  if(s){const va=q/(PI*(s[1]/1000)**2/4);r.push({k:'推奨 SGP 呼び径',t:s[0],main:1},{k:`${s[0]} の内径`,v:s[1],u:'mm'},{k:`${s[0]} での流速`,v:va,u:'m/s'});}
+  else r.push({k:'推奨 SGP 呼び径',t:'150A を超えます',main:1});
+  return{r,f:'d = √(4·Q / (π·v))\nSGP 内径 = 外径 − 2 × 肉厚（JIS G 3452）'};
+ }},
+{id:'dp',cat:'flow',n:'配管の圧力損失',d:'ダルシー・ワイスバッハ式で直管＋局部損失の圧力損失を求めます。',
+ in:[{id:'Q',l:'流量 Q',u:'L/min',v:20},{id:'d',l:'管内径 d',u:'mm',v:12.7},{id:'L',l:'配管長さ L',u:'m',v:5},
+  {id:'eps',l:'管内面粗さ ε',u:'mm',v:0.045},{id:'K',l:'局部損失係数の合計 ΣK',u:'',v:0},...fluidFields('vg32')],
+ calc:v=>{
+  const fl=getFluid(v);const d=v.d/1000;const vel=(v.Q/60000)/(PI*d*d/4);const Re=vel*d/(fl.nu*1e-6);
+  let f;if(Re<2300)f=64/Re;else f=0.25/Math.log10(v.eps/v.d/3.7+5.74/Re**0.9)**2;
+  const dyn=fl.rho*vel*vel/2;const dP=(f*(v.L/d)+v.K)*dyn;
+  return{r:[{k:'圧力損失 ΔP',v:dP/1000,u:'kPa',main:1},{k:'圧力損失 ΔP',v:dP/1e6,u:'MPa',main:1},{k:'損失ヘッド',v:dP/(fl.rho*g),u:'m'},{k:'流速 v',v:vel,u:'m/s'},{k:'レイノルズ数 Re',v:Re},{k:'流れの状態',t:regime(Re)},{k:'管摩擦係数 λ',v:f}],
+   f:'ΔP = (λ·L/d + ΣK) · ρ·v² / 2\n層流：λ = 64 / Re\n乱流：λ = 0.25 / [log₁₀(ε/3.7d + 5.74/Re⁰·⁹)]²   (Swamee–Jain)',
+   note:'粗さの目安　鋼管 0.045 mm／引抜管・樹脂管 0.0015 mm／鋳鉄管 0.26 mm。ΣK の目安　90°エルボ 0.3〜0.9、全開ゲート弁 0.2'};
+ }},
+{id:'cyl',cat:'flow',n:'油圧・空圧シリンダ',d:'内径・ロッド径・圧力・流量から推力と速度を求めます。',
+ in:[{id:'D',l:'シリンダ内径 D',u:'mm',v:63},{id:'dr',l:'ロッド径 d',u:'mm',v:35},{id:'P',l:'使用圧力 P',u:'MPa',v:7},{id:'Q',l:'供給流量 Q',u:'L/min',v:20},{id:'eta',l:'推力効率 η',u:'%',v:100}],
+ calc:v=>{
+  const A1=PI*v.D**2/4,A2=PI*(v.D**2-v.dr**2)/4,e=v.eta/100,q=v.Q*1e6/60;
+  if(v.dr>=v.D)return err('ロッド径が内径以上です');
+  return{r:[{k:'押し力',v:v.P*A1*e/1000,u:'kN',main:1},{k:'引き力',v:v.P*A2*e/1000,u:'kN',main:1},{k:'押し速度',v:q/A1,u:'mm/s',main:1},{k:'引き速度',v:q/A2,u:'mm/s',main:1},
+   {k:'押し側受圧面積',v:A1/100,u:'cm²'},{k:'引き側受圧面積',v:A2/100,u:'cm²'},{k:'押し力',v:v.P*A1*e/g,u:'kgf'}],
+   f:'F = P · A · η\n押し側 A₁ = π·D²/4,  引き側 A₂ = π·(D² − d²)/4\n速度 V = Q / A'};
+ }},
+{id:'pump',cat:'flow',n:'ポンプの所要動力',d:'吐出圧力と流量から水動力・軸動力を求めます。',
+ in:[{id:'P',l:'吐出圧力 P',u:'MPa',v:7},{id:'Q',l:'吐出流量 Q',u:'L/min',v:20},{id:'eta',l:'ポンプ全効率 η',u:'%',v:85},{id:'mg',l:'モーター選定の余裕率',u:'倍',v:1.2}],
+ calc:v=>{
+  const Lw=v.P*v.Q/60,Ls=Lw/(v.eta/100);
+  return{r:[{k:'軸動力',v:Ls,u:'kW',main:1},{k:'モーター容量の目安',v:Ls*v.mg,u:'kW',main:1},{k:'水動力（理論）',v:Lw,u:'kW'},{k:'揚程換算（水）',v:v.P*1e6/(1000*g),u:'m'}],
+   f:'水動力 Lw = P · Q / 60   [kW, MPa, L/min]\n軸動力 Ls = Lw / η'};
+ }},
+
+/* ===== 強度 ===== */
+{id:'axial',cat:'str',n:'引張・圧縮・せん断応力',d:'荷重と断面から応力と安全率を求めます。細長い圧縮部材は「座屈」も確認してください。',
+ in:[{id:'mode',l:'荷重の種類',opt:[['t','引張・圧縮'],['s','せん断']],v:'t'},{id:'F',l:'荷重 F',u:'N',v:10000},...secFields('round',{d:12}),...matFields('ss400',{sy:1}),sft],
+ calc:v=>{
+  const s=section(v);if(!s)return thickErr();const m=getMat(v);const B=baseStr(m);
+  const sh=v.mode==='s';const sig=v.F/s.A;const lim=sh?B.s/Math.sqrt(3):B.s;const SF=lim/sig;
+  return{r:[{k:sh?'せん断応力 τ':'応力 σ',v:sig,u:'MPa',main:1},{k:'安全率',v:SF,main:1,st:sfst(SF,v.sft)},
+   {k:'判定基準：'+B.n+(sh?' ÷ √3':''),v:lim,u:'MPa'},{k:'断面積 A',v:s.A,u:'mm²'},{k:`許容荷重（安全率 ${v.sft}）`,v:lim*s.A/v.sft,u:'N'}],
+   f:(sh?'τ = F / A\n安全率 = (σy / √3) / τ':'σ = F / A\n安全率 = σy / σ')+'\n'+s.f};
+ }},
+{id:'beam',cat:'str',n:'はりの曲げ・たわみ',d:'支持条件・荷重・断面から最大曲げ応力とたわみを求めます（自重は含みません）。',
+ in:[{id:'bc',l:'支持条件と荷重',opt:Object.entries(BEAM).map(([k,b])=>[k,b.n]),v:'cp'},
+  {id:'F',l:v=>/w$/.test(v.bc)?'総荷重 W':'荷重 F',u:'N',v:1000},{id:'L',l:'スパン L',u:'mm',v:500},
+  ...secFields('rect',{b:20,h:40,d:30}),...matFields('ss400',{E:1,sy:1}),sft],
+ calc:v=>{
+  const s=section(v);if(!s)return thickErr();const m=getMat(v);const B=baseStr(m);const bc=BEAM[v.bc];
+  const EI=m.E*1000*s.I,M=bc.M(v.F,v.L),Z=s.I/s.c,sig=M/Z,dl=bc.d(v.F,v.L,EI),SF=B.s/sig;
+  return{r:[{k:'最大曲げ応力 σ',v:sig,u:'MPa',main:1},{k:'最大たわみ δ',v:dl,u:'mm',main:1},{k:'安全率（'+B.n+'）',v:SF,main:1,st:sfst(SF,v.sft)},
+   {k:'最大曲げモーメント M',v:M/1000,u:'N·m'},{k:'たわみ比 δ / L',t:'1 / '+fmtPlain(v.L/dl)},
+   {k:'最大たわみ位置（左端から）',v:/^c/.test(v.bc)?v.L:v.L/2,u:'mm'},{k:'断面二次モーメント I',v:s.I,u:'mm⁴'},{k:'断面係数 Z',v:Z,u:'mm³'},{k:'縦弾性係数 E',v:m.E,u:'GPa'}],
+   f:bc.f+'\nσ = M / Z,   Z = I / e\n'+s.f,viz:{t:'beam',bc:v.bc,F:v.F,L:v.L,EI,Z}};
+ }},
+{id:'shaft',cat:'str',n:'軸のねじり（動力伝達）',d:'伝達動力と回転数から軸のトルク・せん断応力・ねじれ角を求めます。',
+ in:[{id:'P',l:'伝達動力 P',u:'kW',v:2.2},{id:'n',l:'回転数 n',u:'min⁻¹',v:1450},{id:'d',l:'軸径 d',u:'mm',v:25},{id:'di',l:'中空軸の内径 d₁（中実は 0）',u:'mm',v:0},{id:'L',l:'軸の長さ L',u:'mm',v:300},...matFields('s45c',{E:1,sy:1}),{...sft,v:3}],
+ calc:v=>{
+  const m=getMat(v);const B=baseStr(m);const T=9549.3*v.P/v.n,Tm=T*1000,d=v.d,di=v.di||0;
+  if(di>=d)return err('内径が軸径以上です');
+  const Zp=PI*(d**4-di**4)/(16*d),tau=Tm/Zp,ty=B.s/Math.sqrt(3),SF=ty/tau;
+  const G=m.E*1000/(2*1.3),Ip=PI*(d**4-di**4)/32,th=Tm*v.L/(G*Ip)*180/PI;
+  const dreq=Math.cbrt(16*Tm*v.sft/(PI*ty));
+  return{r:[{k:'トルク T',v:T,u:'N·m',main:1},{k:'せん断応力 τ',v:tau,u:'MPa',main:1},{k:'安全率',v:SF,main:1,st:sfst(SF,v.sft)},
+   {k:'ねじれ角（長さ L）',v:th,u:'°'},{k:'ねじれ角（1 m あたり）',v:th/v.L*1000,u:'°/m'},
+   {k:`必要軸径（中実・安全率 ${v.sft}）`,v:dreq,u:'mm'},{k:'判定基準 σy / √3',v:ty,u:'MPa'}],
+   f:'T = 9549 · P / n   [N·m, kW, min⁻¹]\nτ = T / Zp,   Zp = π·(d⁴ − d₁⁴) / (16·d)\nθ = T·L / (G·Ip),   G = E / 2(1 + ν),  ν = 0.3',
+   note:'曲げとの組合せ応力、キー溝の応力集中、疲労は含みません。',viz:{t:'shaft',L:v.L,d,di,tau,th,T}};
+ }},
+{id:'bolt',cat:'str',n:'ボルトの強度・締付トルク',d:'メートル並目ねじの有効断面積で応力・安全率と締付トルクの目安を求めます。',
+ in:[{id:'sz',l:'ねじの呼び',opt:Object.keys(BOLTS).map(k=>[k,k+'（並目）']),v:'M10'},{id:'gr',l:'強度区分',opt:Object.keys(GRADES).map(k=>[k,k==='A2-70'?'A2-70（ステンレス）':k]),v:'8.8'},
+  {id:'mode',l:'荷重の種類',opt:[['t','引張（軸方向）'],['s','せん断']],v:'t'},{id:'F',l:'外力 F（合計）',u:'N',v:20000},{id:'nb',l:'ボルト本数 n',u:'本',v:4},{...sft,v:3}],
+ calc:v=>{
+  const [d,As]=BOLTS[v.sz],[sy]=GRADES[v.gr];const Fb=v.F/v.nb,sig=Fb/As,sh=v.mode==='s';
+  const lim=sh?sy/Math.sqrt(3):sy,SF=lim/sig,Fi=0.7*sy*As,Tq=0.2*d*Fi/1000;
+  return{r:[{k:sh?'せん断応力 τ':'引張応力 σ',v:sig,u:'MPa',main:1},{k:'安全率',v:SF,main:1,st:sfst(SF,v.sft)},{k:'締付トルクの目安',v:Tq,u:'N·m',main:1},
+   {k:'1本あたりの荷重',v:Fb,u:'N'},{k:'有効断面積 As',v:As,u:'mm²'},{k:'降伏点（下限）',v:sy,u:'MPa'},{k:'1本の降伏荷重',v:sy*As/1000,u:'kN'},{k:'締付軸力（降伏の70%）',v:Fi/1000,u:'kN'}],
+   f:'σ = F / (n · As)\n安全率 = σy / σ'+(sh?' （せん断は σy / √3）':'')+'\n締付軸力 Ff = 0.7 · σy · As\n締付トルク T = K · d · Ff   (K = 0.2)',
+   note:'締付トルクは潤滑状態でトルク係数 K が変わります。せん断はねじ部で受ける前提で As を使用しています。'};
+ }},
+{id:'buck',cat:'str',n:'柱の座屈',d:'圧縮部材の座屈荷重をオイラー式（長柱）／ジョンソン式（中間柱）で求めます。',
+ in:[{id:'F',l:'圧縮荷重 F',u:'N',v:5000},{id:'L',l:'柱の長さ L',u:'mm',v:800},{id:'end',l:'両端の条件',opt:Object.entries(ENDS).map(([k,e])=>[k,e[1]]),v:'pp'},
+  ...secFields('pipe',{d:27.2,t:2.3}),...matFields('ss400',{E:1,sy:1}),{...sft,v:3}],
+ calc:v=>{
+  const s=section(v);if(!s)return thickErr();const m=getMat(v);const B=baseStr(m);
+  const K=ENDS[v.end][0],Le=K*v.L,I=s.Imin,r=Math.sqrt(I/s.A),lam=Le/r,E=m.E*1000;
+  const lamT=PI*Math.sqrt(2*E/B.s);let Pcr,meth;
+  if(lam>=lamT){Pcr=PI*PI*E*I/(Le*Le);meth='オイラー式（長柱）';}
+  else{Pcr=s.A*B.s*(1-B.s*lam*lam/(4*PI*PI*E));meth='ジョンソン式（中間柱）';}
+  const SF=Pcr/v.F;
+  return{r:[{k:'座屈荷重 Pcr',v:Pcr/1000,u:'kN',main:1},{k:'座屈安全率',v:SF,main:1,st:sfst(SF,v.sft)},{k:'適用した式',t:meth},
+   {k:'細長比 λ',v:lam},{k:'境界の細長比 π√(2E/σy)',v:lamT},{k:'有効座屈長さ K·L',v:Le,u:'mm'},{k:'断面二次半径 r（弱軸）',v:r,u:'mm'},{k:'圧縮応力 σ',v:v.F/s.A,u:'MPa'}],
+   f:'λ = K·L / r,   r = √(I / A)\nオイラー：Pcr = π²·E·I / (K·L)²\nジョンソン：Pcr = A·σy·(1 − σy·λ² / (4π²·E))\n'+s.f};
+ }},
+
+/* ===== 運動・速さ ===== */
+{id:'acc',cat:'mot',n:'等加速度運動',d:'初速度・加速度・時間から速度と移動距離を求めます。',
+ in:[{id:'v0',l:'初速度 v₀',u:'m/s',v:0},{id:'a',l:'加速度 a',u:'m/s²',v:2},{id:'t',l:'時間 t',u:'s',v:3}],
+ calc:v=>{const vv=v.v0+v.a*v.t,s=v.v0*v.t+v.a*v.t*v.t/2;
+  return{r:[{k:'速度 v',v:vv,u:'m/s',main:1},{k:'移動距離 s',v:s,u:'m',main:1},{k:'速度 v',v:vv*3.6,u:'km/h'},{k:'平均速度',v:(v.v0+vv)/2,u:'m/s'},{k:'加速度',v:v.a/g,u:'G'}],
+   f:'v = v₀ + a·t\ns = v₀·t + ½·a·t²'};}},
+{id:'move',cat:'mot',n:'位置決めの移動時間',d:'台形速度パターンで、移動距離・最高速度・加速度から移動時間を求めます。',
+ in:[{id:'L',l:'移動距離 L',u:'mm',v:500},{id:'vm',l:'最高速度 v',u:'mm/s',v:500},{id:'a',l:'加速度 a（=減速度）',u:'mm/s²',v:2000}],
+ calc:v=>{
+  const ta=v.vm/v.a,La=v.vm**2/(2*v.a);let shape,vp,tt,tc,tA;
+  if(2*La>=v.L){shape='三角（最高速度に届かない）';vp=Math.sqrt(v.a*v.L);tA=vp/v.a;tc=0;tt=2*tA;}
+  else{shape='台形';vp=v.vm;tA=ta;tc=(v.L-2*La)/v.vm;tt=2*ta+tc;}
+  return{r:[{k:'総移動時間',v:tt,u:'s',main:1},{k:'速度パターン',t:shape,main:1},{k:'到達最高速度',v:vp,u:'mm/s'},{k:'加速時間（=減速時間）',v:tA,u:'s'},{k:'等速時間',v:tc,u:'s'},{k:'加速度',v:v.a/1000/g,u:'G'}],
+   f:'加速時間 ta = v / a,   加速距離 La = v² / (2a)\n台形：t = 2·ta + (L − 2·La) / v\n三角：t = 2·√(L / a)'};
+ }},
+{id:'peri',cat:'mot',n:'回転数と周速',d:'直径と回転数から周速（切削速度・ベルト速度など）を、または周速から回転数を求めます。',
+ in:[{id:'mode',l:'計算の向き',opt:[['n2v','回転数 → 周速'],['v2n','周速 → 回転数']],v:'n2v'},{id:'D',l:'直径 D',u:'mm',v:100},
+  {id:'n',l:'回転数 n',u:'min⁻¹',v:1000,show:on('mode','n2v')},{id:'vc',l:'周速 v',u:'m/min',v:150,show:on('mode','v2n')}],
+ calc:v=>{
+  if(v.mode==='n2v'){const vm=PI*v.D*v.n/1000;return{r:[{k:'周速',v:vm,u:'m/min',main:1},{k:'周速',v:vm/60,u:'m/s',main:1},{k:'角速度 ω',v:2*PI*v.n/60,u:'rad/s'}],f:'v = π·D·n / 1000   [m/min]\nω = 2π·n / 60   [rad/s]'};}
+  const n=1000*v.vc/(PI*v.D);return{r:[{k:'回転数 n',v:n,u:'min⁻¹',main:1},{k:'周速',v:v.vc/60,u:'m/s'},{k:'角速度 ω',v:2*PI*n/60,u:'rad/s'}],f:'n = 1000·v / (π·D)   [min⁻¹]'};
+ }},
+{id:'power',cat:'mot',n:'動力・トルク・力',d:'トルクと回転数、または力と速度から動力を求めます。',
+ in:[{id:'mode',l:'入力の組合せ',opt:[['rot','トルク × 回転数'],['lin','力 × 速度']],v:'rot'},
+  {id:'T',l:'トルク T',u:'N·m',v:10,show:on('mode','rot')},{id:'n',l:'回転数 n',u:'min⁻¹',v:1500,show:on('mode','rot')},
+  {id:'F',l:'力 F',u:'N',v:500,show:on('mode','lin')},{id:'vel',l:'速度 v',u:'m/s',v:0.5,show:on('mode','lin')},{id:'eta',l:'伝達効率 η',u:'%',v:100}],
+ calc:v=>{
+  const P=v.mode==='rot'?v.T*2*PI*v.n/60:v.F*v.vel;const Pin=P/(v.eta/100);
+  return{r:[{k:'出力動力 P',v:P/1000,u:'kW',main:1},{k:'必要入力動力',v:Pin/1000,u:'kW',main:1},{k:'出力動力 P',v:P,u:'W'},{k:'出力動力 P',v:P/735.49875,u:'PS'}],
+   f:v.mode==='rot'?'P = T·ω = 2π·n·T / 60\n入力 = P / η':'P = F · v\n入力 = P / η'};
+ }},
+{id:'screw',cat:'mot',n:'ボールねじの速度・トルク',d:'リードと回転数から送り速度を、推力から必要な駆動トルクを求めます。',
+ in:[{id:'l',l:'リード l',u:'mm',v:10},{id:'n',l:'回転数 n',u:'min⁻¹',v:1500},{id:'F',l:'軸方向荷重 F',u:'N',v:500},{id:'eta',l:'ねじ効率 η',u:'%',v:90}],
+ calc:v=>{
+  const V=v.l*v.n/60,T=v.F*v.l/(2*PI*v.eta/100)/1000;
+  return{r:[{k:'送り速度',v:V,u:'mm/s',main:1},{k:'駆動トルク',v:T,u:'N·m',main:1},{k:'送り速度',v:V*60/1000,u:'m/min'},{k:'所要動力',v:T*2*PI*v.n/60,u:'W'}],
+   f:'送り速度 V = l · n / 60\n駆動トルク T = F · l / (2π · η)',note:'摩擦・予圧トルク、加速トルクは別途加算してください。'};
+ }},
+{id:'inertia',cat:'mot',n:'回転体の慣性・加速トルク',d:'円板・円筒の慣性モーメントと、目標回転数まで加速するのに必要なトルクを求めます。',
+ in:[{id:'D',l:'外径 D',u:'mm',v:100},{id:'di',l:'内径 d₁（中実は 0）',u:'mm',v:0},{id:'L',l:'厚さ・長さ L',u:'mm',v:20},...matFields('ss400',{rho:1}),{id:'n',l:'目標回転数 n',u:'min⁻¹',v:1500},{id:'t',l:'加速時間 t',u:'s',v:0.5}],
+ calc:v=>{
+  const m=getMat(v);if(v.di>=v.D)return err('内径が外径以上です');
+  const kg=PI*(v.D**2-v.di**2)/4*v.L/1000*m.rho/1000;const J=kg*(v.D**2+v.di**2)/8*1e-6;const w=2*PI*v.n/60;
+  return{r:[{k:'慣性モーメント J',v:J,u:'kg·m²',main:1},{k:'加速トルク T',v:J*w/v.t,u:'N·m',main:1},{k:'質量 m',v:kg,u:'kg'},{k:'GD²',v:4*J,u:'kg·m²'},{k:'回転エネルギー',v:J*w*w/2,u:'J'},{k:'角速度 ω',v:w,u:'rad/s'}],
+   f:'J = m·(D² + d₁²) / 8\nT = J · ω / t,   ω = 2π·n / 60\nE = ½·J·ω²'};
+ }},
+{id:'lever',cat:'mot',n:'力とトルク（テコ）',d:'腕の長さと力からトルクを、または必要なトルクから腕に加える力を求めます。力が斜めのときは腕に直角な成分だけが効きます。',
+ in:[{id:'mode',l:'計算の向き',opt:[['f2t','力 → トルク'],['t2f','必要トルク → 必要な力']],v:'f2t'},
+  {id:'F',l:'力 F',u:'N',v:50,show:on('mode','f2t')},{id:'TD',l:'必要トルク T（抵抗トルク）',u:'N·m',v:2,show:on('mode','t2f')},
+  {id:'L',l:'腕の長さ L',u:'mm',v:80},{id:'th',l:'腕と力のなす角 θ（直角 = 90）',u:'°',v:90}],
+ calc:v=>{
+  const s=Math.sin(v.th*PI/180),Lm=v.L/1000;
+  if(Math.abs(s)<1e-9)return err('θ = 0°・180°（腕と同じ向き）の力はトルクになりません');
+  if(v.mode==='f2t'){const T=v.F*s*Lm;
+   return{r:[{k:'トルク T',v:T,u:'N·m',main:1},{k:'トルク T',v:T*1000,u:'N·mm',main:1},{k:'腕に直角な力 F·sinθ',v:v.F*s,u:'N'},{k:'トルク T',v:T/g,u:'kgf·m'}],
+    f:'T = F · sinθ · L\n（θ = 90° のとき T = F · L）'};}
+  const F=v.TD/(Lm*s);
+  return{r:[{k:'必要な力 F（これより大きく）',v:F,u:'N',main:1},{k:'必要な力 F',v:F/g,u:'kgf',main:1},{k:'腕に直角な成分',v:F*s,u:'N'}],
+   f:'回すための条件  T < F · sinθ · L\n→  F > T / (L · sinθ)'};
+ }},
+{id:'loadtq',cat:'mot',n:'負荷トルク（加減速・減速比）',d:'回転の運動方程式から加減速に必要なトルクを負荷軸で求め、減速比でモータ軸に換算します。モータのカタログトルクと比較もできます。',
+ in:[{id:'J',l:'負荷の慣性モーメント J（負荷軸まわり）',u:'kg·m²',v:0.05},
+  {id:'N1',l:'変化前の回転数 N₁（負荷軸）',u:'min⁻¹',v:0},{id:'N2',l:'変化後の回転数 N₂（負荷軸）',u:'min⁻¹',v:100},
+  {id:'dt',l:'加減速時間 Δt',u:'s',v:0.5},{id:'i',l:'減速比 i（直結は 1）',u:'',v:10},{id:'eta',l:'伝達効率 η',u:'%',v:100},
+  {id:'tmb',l:'比較するモータトルクの値',opt:[['none','比較しない'],['motor','モータ軸の値（モータ単体のカタログ値）'],['out','出力軸の値（ギアヘッド付きセットのカタログ値）']],v:'none'},
+  {id:'TMc',l:'カタログのモータトルク',u:'N·m',v:0.5,show:v=>v.tmb!=='none'},
+  {id:'sft',l:'目標安全率',u:'',v:1.5,show:v=>v.tmb!=='none'}],
+ calc:v=>{
+  if(!(v.dt>0))return err('加減速時間は 0 より大きくしてください');
+  if(!(v.i>0)||!(v.eta>0))return err('減速比・効率は 0 より大きくしてください');
+  const al=2*PI*(v.N2-v.N1)/(60*v.dt),TL=v.J*al,TM=TL/(v.i*v.eta/100);
+  const r=[{k:'モータ軸の必要トルク T',v:TM,u:'N·m',main:1},{k:'負荷軸の必要トルク T_L',v:TL,u:'N·m',main:1},
+   {k:'角加速度（負荷軸）',v:al,u:'rad/s²'},{k:'モータ回転数（変化前）',v:v.N1*v.i,u:'min⁻¹'},{k:'モータ回転数（変化後）',v:v.N2*v.i,u:'min⁻¹'}];
+  let f='負荷軸：T_L = J · 2π(N₂ − N₁) / (60 · Δt)\nモータ軸：T = T_L / (i · η)';
+  if(v.tmb!=='none'){
+   const need=Math.abs(TM),cap=v.tmb==='motor'?v.TMc:v.TMc/v.i,sf=cap/need;
+   r.push({k:'モータ軸で比較できるトルク',v:cap,u:'N·m'},{k:'負荷軸に換算したモータトルク T_M = i · T_M′',v:cap*v.i,u:'N·m'},{k:'安全率（モータ軸）',v:sf,u:'',st:sfst(sf,v.sft)});
+   f+=v.tmb==='motor'?'\n負荷軸換算：T_M = i · T_M′\n安全率 = T_M′ / |T|':'\n出力軸カタログ値 → モータ軸：T_M′ = T_out / i\n安全率 = T_M′ / |T|';
+  }
+  return{r,f,note:(TL<0?'負の値は減速（制動）トルクです。':'')+'J は負荷軸まわりの値です。モータ自身のロータ慣性や摩擦などの一定負荷トルクは別途加算してください。'};
+ }},
+{id:'stop',cat:'mot',n:'停止時の衝撃力',d:'動いている物体を一定距離で止めるときの平均減速度と平均衝撃力を求めます。',
+ in:[{id:'m',l:'質量 m',u:'kg',v:50},{id:'vel',l:'速度 v',u:'m/s',v:1},{id:'s',l:'停止距離 s（緩衝ストローク）',u:'mm',v:20}],
+ calc:v=>{const E=v.m*v.vel**2/2,a=v.vel**2/(2*v.s/1000);
+  return{r:[{k:'平均衝撃力 F',v:v.m*a,u:'N',main:1},{k:'運動エネルギー E',v:E,u:'J',main:1},{k:'平均減速度',v:a,u:'m/s²'},{k:'平均減速度',v:a/g,u:'G'},{k:'停止時間',v:2*(v.s/1000)/v.vel,u:'s'}],
+   f:'E = ½·m·v²\na = v² / (2·s)\nF = m · a',note:'ピーク力は緩衝器の特性によって平均値より大きくなります。'};}},
+{id:'fall',cat:'mot',n:'自由落下',d:'落下高さから落下時間・衝突速度・位置エネルギーを求めます（空気抵抗なし）。',
+ in:[{id:'h',l:'落下高さ h',u:'m',v:1},{id:'m',l:'質量 m',u:'kg',v:10}],
+ calc:v=>({r:[{k:'衝突速度 v',v:Math.sqrt(2*g*v.h),u:'m/s',main:1},{k:'落下時間 t',v:Math.sqrt(2*v.h/g),u:'s',main:1},{k:'位置エネルギー',v:v.m*g*v.h,u:'J'},{k:'衝突速度 v',v:Math.sqrt(2*g*v.h)*3.6,u:'km/h'}],
+  f:'t = √(2h / g)\nv = √(2g·h)\nE = m·g·h'})},
+{id:'cent',cat:'mot',n:'遠心力',d:'回転する質量にはたらく遠心力を求めます。',
+ in:[{id:'m',l:'質量 m',u:'kg',v:0.5},{id:'r',l:'回転半径 r',u:'mm',v:100},{id:'n',l:'回転数 n',u:'min⁻¹',v:3000}],
+ calc:v=>{const w=2*PI*v.n/60,F=v.m*(v.r/1000)*w*w;
+  return{r:[{k:'遠心力 F',v:F,u:'N',main:1},{k:'遠心力 F',v:F/g,u:'kgf',main:1},{k:'遠心加速度',v:(v.r/1000)*w*w/g,u:'G'},{k:'周速',v:(v.r/1000)*w,u:'m/s'}],
+   f:'F = m · r · ω²,   ω = 2π·n / 60'};}},
+
+/* ===== 単位換算 ===== */
+{id:'conv',cat:'unit',n:'単位換算',d:'長さ・力・圧力・トルク・動力・流量・速度などを一括変換します。',
+ in:[{id:'val',l:'値',u:'',v:1},{id:'from',l:'変換元の単位',opt:Object.entries(UNITS).map(([k,G])=>({g:G.n,o:G.u.map(([n])=>[k+'|'+n,n])})),v:'pres|MPa'}],
+ calc:v=>{
+  const [gk,un]=v.from.split('|');const G=UNITS[gk];const fac=G.u.find(x=>x[0]===un)[1];const base=v.val*fac;
+  return{r:G.u.filter(x=>x[0]!==un).map(([n,f])=>({k:G.n,v:base/f,u:n})),f:''};
+ }}
+];
+
+/* ---------- formatting ---------- */
+function fmtPlain(x){if(typeof x!=='number'||!isFinite(x))return '—';return Number(x.toPrecision(4)).toLocaleString('ja-JP',{maximumFractionDigits:8});}
+function fmt(x){
+  if(typeof x!=='number'||!isFinite(x))return '—';
+  const a=Math.abs(x);
+  if(a!==0&&(a>=1e7||a<1e-3)){const [m,e]=x.toExponential(3).split('e');return m+'×10<sup>'+(+e)+'</sup>';}
+  return fmtPlain(x);
+}
+function num(s){
+  s=String(s).replace(/[０-９．－＋ｅＥ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[,，\s]/g,'').replace(/^ー/,'-');
+  if(s==='')return NaN;const n=Number(s);return n;
+}
+
+/* ---------- state / render ---------- */
+const store={get(k){try{return JSON.parse(localStorage.getItem('mcb:'+k))}catch(e){return null}},set(k,v){try{localStorage.setItem('mcb:'+k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem('mcb:'+k)}catch(e){}}};
+let cur=null,fields=[];
+const ST={ok:'OK',warn:'要検討',ng:'NG'};
+
+function buildOpts(sel,opt){
+  if(opt[0]&&opt[0].g){opt.forEach(gp=>{const og=document.createElement('optgroup');og.label=gp.g;gp.o.forEach(([val,lab])=>og.append(new Option(lab,val)));sel.append(og);});}
+  else opt.forEach(([val,lab])=>sel.append(new Option(lab,val)));
+}
+function renderNav(){
+  const nav=$('#nav');nav.innerHTML='';const q=($('#q').value||'').trim().toLowerCase();let hits=0;
+  CATS.forEach(c=>{
+    const items=CALCS.filter(x=>x.cat===c.id&&(!q||(x.n+' '+x.d).toLowerCase().includes(q)));if(!items.length)return;
+    const g=document.createElement('div');g.className='ng';const h=document.createElement('h3');h.textContent=c.n;const ul=document.createElement('ul');
+    items.forEach(x=>{hits++;const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.className='nv';
+      const t=document.createElement('span');t.textContent=x.n;b.append(t);
+      const k=recs(x.id).length;if(k){const bd=document.createElement('span');bd.className='bd';bd.textContent=k;bd.title='記録 '+k+' 件';b.append(bd);}
+      if(cur.id===x.id)b.setAttribute('aria-current','page');b.onclick=()=>go(x.id);li.append(b);ul.append(li);});
+    g.append(h,ul);nav.append(g);});
+  $('#nohit').hidden=hits>0;
+  const pk=$('#pick');pk.innerHTML='';
+  CATS.forEach(c=>{const og=document.createElement('optgroup');og.label=c.n;
+    CALCS.filter(x=>x.cat===c.id).forEach(x=>{const k=recs(x.id).length;og.append(new Option(x.n+(k?'（記録 '+k+'）':''),x.id));});pk.append(og);});
+  pk.value=cur.id;
+}
+function go(id){
+  openCalc(id);store.set('last',id);store.set('lastIn:'+cur.cat,id);
+  try{history.replaceState(null,'','#'+id)}catch(e){}
+}
+function openCalc(id,reset){
+  const c=CALCS.find(x=>x.id===id)||CALCS[0];cur=c;renderNav();
+  $('#ccat').textContent=(CATS.find(x=>x.id===c.cat)||{}).n||'';$('#ctitle').textContent=c.n;$('#cdesc').textContent=c.d;
+  const saved=(!reset&&store.get('in:'+c.id))||{};const form=$('#form');form.innerHTML='';fields=[];
+  c.in.forEach(inp=>{
+    const wrap=document.createElement('div');wrap.className='field'+(inp.opt?' sel':'');
+    const lab=document.createElement('label');lab.htmlFor='f-'+c.id+'-'+inp.id;
+    const ctl=document.createElement('div');ctl.className='ctl';let el;
+    if(inp.opt){el=document.createElement('select');buildOpts(el,inp.opt);}
+    else{el=document.createElement('input');el.type='text';el.inputMode='decimal';el.spellcheck=false;}
+    el.id='f-'+c.id+'-'+inp.id;
+    el.value=saved[inp.id]!==undefined?saved[inp.id]:inp.v;
+    if(inp.opt&&el.selectedIndex<0)el.value=inp.v;
+    ctl.append(el);
+    if(inp.u){const u=document.createElement('span');u.className='unit';u.textContent=inp.u;ctl.append(u);}
+    wrap.append(lab,ctl);form.append(wrap);fields.push({inp,el,wrap,lab});
+    el.addEventListener('input',update);el.addEventListener('change',update);
+  });
+  recMsg('');update();renderRecs();
+}
+function update(){
+  const v={},raw={};
+  fields.forEach(f=>{raw[f.inp.id]=f.el.value;v[f.inp.id]=f.inp.opt?f.el.value:num(f.el.value);});
+  store.set('in:'+cur.id,raw);
+  fields.forEach(f=>{f.wrap.hidden=f.inp.show?!f.inp.show(v):false;f.lab.textContent=typeof f.inp.l==='function'?f.inp.l(v):f.inp.l;
+    if(!f.inp.opt)f.el.classList.toggle('bad',!f.wrap.hidden&&!isFinite(v[f.inp.id]));});
+  let out;try{out=cur.calc(v);}catch(e){out=err('入力値を確認してください');}
+  lastOut=out;renderRes(out);
+  let svg='';try{svg=DG[cur.id]?DG[cur.id](v):'';}catch(e){svg='';}
+  $('#figsvg').innerHTML=svg;$('#fig').hidden=!svg;
+}
+function row(x,main){
+  const d=document.createElement('div');d.className=main?'m':'r';if(x.st)d.dataset.st=x.st;
+  const val=x.t!==undefined?esc(x.t):fmt(x.v);
+  d.innerHTML='<span class="k">'+esc(x.k)+'</span><span class="v">'+val+(x.u?'<span class="u">'+esc(x.u)+'</span>':'')+(x.st?'<span class="chip '+x.st+'">'+ST[x.st]+'</span>':'')+'</span>';
+  return d;
+}
+function renderRes(out){
+  const res=$('#res');res.innerHTML='';
+  const mains=out.r.filter(x=>x.main||x.st),rest=out.r.filter(x=>!(x.main||x.st));
+  if(mains.length){const gd=document.createElement('div');gd.className='mains';mains.forEach(x=>gd.append(row(x,true)));res.append(gd);}
+  const rr=$('#resrows');rr.innerHTML='';if(rest.length){const rs=document.createElement('div');rs.className='rows';rest.forEach(x=>rs.append(row(x,false)));rr.append(rs);}
+  showViz(isErr(out)?null:out.viz);
+  const f=out.f||'';$('#fmwrap').hidden=!f;$('#fm').textContent=f;
+  $('#note').textContent=out.note||'';$('#note').hidden=!out.note;
+}
+/* ---------- diagrams ---------- */
+const DG=(()=>{
+const n1=x=>Math.round(x*10)/10;
+const L=(a,b,c,d,k='s')=>`<line x1="${n1(a)}" y1="${n1(b)}" x2="${n1(c)}" y2="${n1(d)}" class="${k}"/>`;
+const R=(x,y,w,h,k='f')=>`<rect x="${n1(x)}" y="${n1(y)}" width="${n1(Math.max(0,w))}" height="${n1(Math.max(0,h))}" class="${k}"/>`;
+const C=(x,y,r,k='f')=>`<circle cx="${n1(x)}" cy="${n1(y)}" r="${n1(Math.max(0,r))}" class="${k}"/>`;
+const P=(d,k='s')=>`<path d="${d}" class="${k}"/>`;
+const T=(x,y,s,k,a)=>`<text x="${n1(x)}" y="${n1(y)}" text-anchor="${a||'middle'}"${k?` class="${k}"`:''}>${s}</text>`;
+const A=(a,b,c,d)=>`<line x1="${n1(a)}" y1="${n1(b)}" x2="${n1(c)}" y2="${n1(d)}" class="a" marker-end="url(#ah)"/>`;
+const AP=d=>`<path d="${d}" class="a" marker-end="url(#ah)"/>`;
+const AX=(a,b,c,d)=>`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" class="d" marker-end="url(#dh)"/>`;
+const D=(a,b,c,d,s,dx,dy,an)=>`<line x1="${n1(a)}" y1="${n1(b)}" x2="${n1(c)}" y2="${n1(d)}" class="d" marker-start="url(#dh)" marker-end="url(#dh)"/>`+(s?T((a+c)/2+(dx||0),(b+d)/2+(dy??-5),s,'tm',an):'');
+const DX=(x1,x2,y,s,y0)=>{const dn=y0!=null&&y>y0;return(y0!=null?L(x1,y0,x1,y+(dn?4:-4),'d')+L(x2,y0,x2,y+(dn?4:-4),'d'):'')+D(x1,y,x2,y,s,0,dn?14:-5);};
+const DY=(y1,y2,x,s,x0)=>{const lf=x0!=null&&x<x0;return(x0!=null?L(x0,y1,x+(lf?-4:4),y1,'d')+L(x0,y2,x+(lf?-4:4),y2,'d'):'')+D(x,y1,x,y2,s,lf?-6:6,4,lf?'end':'start');};
+const GND=(x,y,w)=>{let s=L(x,y,x+w,y);for(let i=x+6;i<=x+w;i+=8)s+=L(i,y,i-6,y+6,'h');return s;};
+const CEIL=(x,y,w)=>{let s=L(x,y,x+w,y);for(let i=x;i<x+w-4;i+=8)s+=L(i,y,i+6,y-6,'h');return s;};
+const WALL=(x,y,h,sd)=>{let s=L(x,y,x,y+h);for(let j=y;j<y+h-4;j+=8)s+=L(x,j+6,x+6*sd,j,'h');return s;};
+const PIN=(x,y)=>P(`M${x},${y}L${x-9},${y+14}L${x+9},${y+14}Z`,'f')+GND(x-15,y+14,30);
+const ROL=(x,y)=>P(`M${x},${y}L${x-9},${y+11}L${x+9},${y+11}Z`,'f')+C(x-5,y+14,3)+C(x+5,y+14,3)+GND(x-15,y+17,30);
+const TQ=(cx,cy,rx,ry,ccw)=>AP(ccw?`M${cx},${cy-ry}A${rx} ${ry} 0 1 0 ${cx+rx},${cy}`:`M${cx},${cy-ry}A${rx} ${ry} 0 1 1 ${cx-rx},${cy}`);
+const cl=(x,a,b)=>Math.min(b,Math.max(a,isFinite(x)?x:a));
+const DEFS='<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ahd"/></marker><marker id="dh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1.5L10,5L0,8.5z" class="dhd"/></marker></defs>';
+const sv=(w,h,b)=>`<svg class="dg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(cur.n)}の図解" xmlns="http://www.w3.org/2000/svg">${DEFS}${b}</svg>`;
+const SEC=(cx,cy,v)=>{let s='';const m=44;
+  if(v.sh==='round')s=C(cx,cy,m/2,'fm');
+  else if(v.sh==='pipe'){const ri=m/2*(1-2*v.t/v.d);s=C(cx,cy,m/2,'fm')+(isFinite(ri)&&ri>0?C(cx,cy,ri,'bg'):'');}
+  else{let b=v.b,h=v.h;if(!(b>0&&h>0)){b=1;h=1;}const k=m/Math.max(b,h),W=b*k,H=h*k;s=R(cx-W/2,cy-H/2,W,H,'fm');
+    if(v.sh==='sq'){const t=Math.max(2,v.t*k);if(W-2*t>0&&H-2*t>0)s+=R(cx-W/2+t,cy-H/2+t,W-2*t,H-2*t,'bg');}}
+  return s+T(cx,cy+40,'断面','tm');};
+const pipe=lab=>sv(360,145,P('M30,80L330,80','pw')+P('M30,80L330,80','pi')+A(70,80,290,80)+T(180,48,'流速 v','ta')+T(30,40,'流量 Q','tm','start')+DY(62,98,345,'d',330)+T(180,132,lab,'tm'));
+return{
+mass:v=>{const sh=v.sh;
+  if(sh==='sph')return sv(360,180,C(180,80,55,'fm')+L(110,80,250,80,'c')+L(180,15,180,145,'c')+DX(125,235,160,'d',80)+T(300,40,'V = π·d³/6','tm'));
+  if(sh==='cone')return sv(360,180,P('M120,140L240,140L180,30Z','fm')+L(180,20,180,150,'c')+DX(120,240,160,'d',140)+DY(30,140,270,'h',180));
+  const sq=sh==='box'||sh==='sq',hh=sq?46:70,top=85-hh/2;let s=T(75,22,'断面','tm')+T(242,22,'側面','tm');
+  if(sh==='round')s+=C(75,85,35,'fm')+L(32,85,118,85,'c')+L(75,42,75,128,'c')+DX(40,110,145,'d',85);
+  else if(sh==='pipe')s+=C(75,85,35,'fm')+C(75,85,28,'bg')+L(32,85,118,85,'c')+L(75,42,75,128,'c')+DX(40,110,145,'D',85)+L(97,63,116,44,'d')+T(119,44,'t','tm','start');
+  else if(sh==='box')s+=R(40,62,70,46,'fm')+DX(40,110,140,'a',108)+DY(62,108,24,'b',40);
+  else if(sh==='sq')s+=R(40,62,70,46,'fm')+R(46,68,58,34,'bg')+DX(40,110,140,'a',108)+DY(62,108,24,'b',40)+L(107,66,124,48,'d')+T(127,48,'t','tm','start');
+  else s+=P('M75,50L105.3,67.5L105.3,102.5L75,120L44.7,102.5L44.7,67.5Z','fm')+DX(44.7,105.3,145,'s',102.5);
+  s+=R(150,top,185,hh,'fm');
+  if(!sq)s+=L(140,85,345,85,'c');
+  if(sh==='pipe')s+=L(150,57,335,57,'hid')+L(150,113,335,113,'hid');
+  if(sh==='sq')s+=L(150,top+6,335,top+6,'hid')+L(150,top+hh-6,335,top+hh-6,'hid');
+  s+=DX(150,335,145,'L',top+hh);
+  return sv(360,165,s);},
+tank:v=>{let s='';
+  if(v.sh==='v'){const r=cl(v.lv/v.H,0,1),yl=145-120*r;
+    s+=R(131,yl,98,145-yl,'lq')+R(130,25,100,120,'s')+L(130,yl,230,yl,'d')+P(`M174,${n1(yl-11)}L186,${n1(yl-11)}L180,${n1(yl-2)}Z`,'ahd')+DX(130,230,162,'D',145)+DY(25,145,255,'H',230)+DY(yl,145,105,'h',130);
+    return sv(360,180,s);}
+  if(v.sh==='h'){const r=cl(v.lv/v.D,0,1),R0=55,cx=90,cy=85,hh=110*r,yl=140-hh,w=Math.sqrt(Math.max(0,R0*R0-(R0-hh)**2));
+    if(hh>=109.9)s+=C(cx,cy,R0,'lq');else if(hh>0.1)s+=P(`M${n1(cx-w)},${n1(yl)}A${R0} ${R0} 0 ${hh>R0?1:0} 0 ${n1(cx+w)},${n1(yl)}Z`,'lq');
+    s+=C(cx,cy,R0,'s')+L(cx-w,yl,cx+w,yl,'d')+R(170,yl,165,140-yl,'lq')+R(170,30,165,110,'s')+L(170,yl,335,yl,'d')+T(90,20,'端面','tm')+T(252,20,'側面','tm')
+      +DX(35,145,162,'D',85)+DX(170,335,162,'L',140)+DY(yl,140,24,'h',cx);
+    return sv(360,180,s);}
+  const r=cl(v.lv/v.H,0,1),yl=145-105*r;
+  s+=R(120,yl,110,145-yl,'lq')+R(120,40,110,105,'s')+P('M120,40L150,22L260,22L230,40M260,22L260,127L230,145','s')+L(120,yl,230,yl,'d')
+    +DX(120,230,162,'a',145)+D(238,152,268,134,'b',10,8,'start')+DY(40,145,100,'H',120)+DY(yl,145,78,'h',120);
+  return sv(360,180,s);},
+vel:v=>pipe('Re = v·d / ν'),
+pipesize:v=>pipe('d = √(4Q / πv) → SGP 呼び径を選定'),
+dp:v=>sv(360,175,P('M30,125L265,125L265,30','pw')+P('M30,125L265,125L265,30','pi')+A(50,125,200,125)+A(265,105,265,50)+T(30,92,'P₁','ta','start')+T(294,42,'P₂','ta','start')+T(140,96,'直管長 L・内径 d','tm')+T(180,168,'局部損失 ΣK：エルボ・弁など','tm')+T(120,40,'ΔP = P₁ − P₂','ta')),
+cyl:v=>sv(380,165,R(38,52,112,56,'lq')+R(30,45,200,70,'s')+L(38,52,222,52)+L(38,108,222,108)+R(30,45,8,70,'fm')+R(222,45,8,70,'fm')+R(150,52,12,56,'fm')+R(162,72,175,16,'fm')
+  +L(59,45,59,22)+L(71,45,71,22)+A(65,6,65,44)+T(78,18,'P, Q','ta','start')+A(340,80,374,80)+T(357,70,'F','ta')+DY(52,108,16,'D',30)+T(282,64,'ロッド径 d','tm')
+  +T(190,148,'押し A₁ = πD²/4　引き A₂ = π(D²−d²)/4','tm')),
+pump:v=>sv(360,150,R(21,112,88,37,'lq')+R(20,100,90,50,'s')+P('M65,138L65,80L140,80','pp')+C(160,80,20,'f')+P('M160,80L172,72M160,80L148,72M160,80L160,94','s')+L(180,80,205,80)+R(205,65,60,30,'fm')+T(235,85,'M','')
+  +P('M160,60L160,40L340,40','pp')+L(200,40,200,29)+C(200,20,9,'f')+T(214,24,'P','ta','start')+A(275,52,335,52)+T(305,68,'Q','ta')+T(160,120,'ポンプ η','tm')+T(235,112,'軸動力 Ls','tm')),
+axial:v=>{let s=R(70,65,190,30,'fm')+L(165,52,165,108,'d');
+  if(v.mode!=='s')s+=A(68,80,20,80)+A(262,80,310,80)+T(34,70,'F','ta')+T(296,70,'F','ta')+T(165,125,'断面積 A','tm')+T(165,44,'σ = F / A','tm');
+  else s+=A(130,20,130,62)+A(200,140,200,98)+T(140,30,'F','ta','start')+T(210,135,'F','ta','start')+T(110,125,'せん断面 A','tm')+T(250,44,'τ = F / A','tm');
+  return sv(380,150,s+SEC(342,80,v));},
+beam:v=>{const cant=/^c/.test(v.bc),fix=/^f/.test(v.bc),dist=/w$/.test(v.bc),sp=!cant&&!fix;let s='';
+  if(cant)s+=WALL(60,40,72,-1);else if(fix)s+=WALL(60,40,72,-1)+WALL(300,40,72,1);else s+=PIN(70,82)+ROL(290,82);
+  s+=R(60,70,240,12,'fm');
+  if(dist){for(let x=72;x<=292;x+=22)s+=A(x,42,x,68);s+=L(60,42,300,42,'a')+T(180,32,'W（総荷重）','ta');}
+  else{const x=cant?296:180;s+=A(x,16,x,68)+T(x-8,28,'F','ta','end');}
+  s+=P(cant?'M60,82Q200,82 300,108':sp?'M70,82Q180,118 290,82':'M60,82C120,82 130,100 180,100S240,82 300,82','dfl')+(cant?T(306,112,'δ','ta','start'):T(186,116,'δ','ta','start'));
+  s+=sp?DX(70,290,150,'L',113):DX(60,300,150,'L',82);
+  return sv(380,168,s+SEC(348,76,v));},
+shaft:v=>sv(380,165,R(50,70,230,30,'fm')+L(40,85,292,85,'c')+TQ(262,85,10,26)+TQ(68,85,10,26,1)+T(262,50,'T','ta')+T(68,50,'T','ta')+T(165,55,'P, n','tm')+DY(70,100,30,'d',50)+DX(50,280,135,'L',100)+T(300,90,'θ：ねじれ角','tm','start')),
+bolt:v=>{const sh=v.mode==='s',y0=sh?60:58,y1=sh?100:102;let s='';
+  s+=sh?R(40,60,220,20,'fm')+R(100,80,220,20,'fm'):R(60,58,240,20,'fm')+R(60,82,240,20,'fm');
+  s+=R(160,y0-14,40,14,'f')+R(172,y0,16,y1-y0,'f')+R(160,y1,40,14,'f')+T(206,y0-18,'締付トルク T','tm','start');
+  s+=sh?A(38,70,6,70)+T(24,58,'F / n','ta')+A(322,90,354,90)+T(336,80,'F / n','ta')+L(150,80,210,80,'dfl')+T(180,140,'せん断面（有効断面積 As）','tm')
+       :A(100,56,100,18)+T(108,28,'F / n','ta','start')+A(260,104,260,145)+T(268,140,'F / n','ta','start')+T(160,160,'As：有効断面積','tm');
+  return sv(360,170,s);},
+buck:v=>{const e=v.end,K=(ENDS[e]||[1])[0],pinT=e==='pp'||e==='fp',yT=pinT?31:45;let s='';
+  s+=e==='pp'?PIN(178,155):GND(148,155,60);
+  if(pinT)s+=P('M178,45L169,31L187,31Z','f')+CEIL(160,31,36);else if(e==='xx')s+=CEIL(148,45,60);
+  s+=R(170,45,16,110,'fm');
+  s+=P({pp:'M178,45Q214,100 178,155',ff:'M178,155Q178,90 212,45',fp:'M178,45C210,75 205,125 178,155',xx:'M178,45C178,72 204,78 204,100S178,128 178,155'}[e]||'','dfl');
+  s+=A(178,yT-30,178,yT-2)+T(188,yT-16,'F','ta','start')+DY(45,155,128,'L',170)+T(222,104,'K = '+K,'ta','start')+SEC(322,100,v);
+  return sv(380,185,s);},
+acc:v=>{const dec=v.a<0,y0=dec?40:(v.v0>0?105:140),y1=dec?105:40;
+  return sv(360,170,P(`M50,140L50,${y0}L280,${y1}L280,140Z`,'lq')+L(50,y0,280,y1)+AX(50,150,50,12)+AX(40,140,335,140)+L(50,y1,280,y1,'hid')
+   +T(44,y0+4,'v₀','tm','end')+T(44,y1+4,'v','tm','end')+T(280,156,'t','tm')+T(56,16,'速度','tm','start')+T(330,156,'時間','tm','end')+T(165,124,'面積 = 移動距離 s','ta')+T(150,dec?60:70,'傾き = a','tm','start'));},
+move:v=>{const tri=v.vm**2/v.a>=v.L,pts=tri?'M40,140L180,60L320,140':'M40,140L110,50L250,50L320,140',pk=tri?60:50;let s=P(pts+'Z','lq')+P(pts,'s')+AX(40,150,40,12)+AX(30,140,345,140);
+  s+=tri?DX(40,180,160,'tₐ',140)+DX(180,320,160,'tₐ',140):DX(40,110,160,'tₐ',140)+DX(110,250,160,'等速',140)+DX(250,320,160,'tₐ',140);
+  s+=L(40,pk,tri?180:110,pk,'hid')+T(34,pk+4,'v','tm','end')+T(180,112,'面積 = 移動距離 L','ta')+T(46,16,'速度','tm','start')+T(345,134,'時間','tm','end')+(tri?T(250,60,'三角駆動','tm','start'):'');
+  return sv(360,182,s);},
+peri:v=>sv(360,195,C(110,90,55,'fm')+C(110,90,6,'f')+L(40,90,180,90,'c')+L(110,20,110,160,'c')+AP('M110,159A69 69 0 0 1 41,90')+T(52,152,'n','ta','end')+A(110,35,210,35)+T(216,39,'v（周速）','ta','start')+DX(55,165,174,'D',90)),
+power:v=>v.mode==='lin'
+  ?sv(360,150,GND(20,120,200)+R(70,80,70,40,'fm')+A(140,100,205,100)+T(175,92,'F','ta')+A(80,66,135,66)+T(108,58,'v','ta')+T(280,95,'P = F · v','ta'))
+  :sv(360,165,C(110,85,40,'fm')+C(110,85,5,'f')+TQ(110,85,55,55)+T(170,36,'T','ta')+T(110,158,'n','tm')+T(265,80,'P = T · ω','ta')+T(265,100,'ω = 2πn / 60','tm')),
+screw:v=>{let th='';for(let x=81;x<360;x+=14)th+=L(x,93,x+8,77,'s');
+  return sv(380,165,R(15,65,45,40,'fm')+T(37,90,'M','')+L(60,85,75,85,'pp')+R(75,77,290,16,'f')+th+R(170,60,60,50,'fm')+T(200,90,'ナット','')
+   +AP('M95,63A8 22 0 1 1 87,85')+T(95,52,'n','ta')+DX(285,299,62,'l',77)+A(200,45,250,45)+T(258,49,'V','ta','start')+A(262,125,232,125)+T(268,129,'F','ta','start')+T(190,156,'T = F · l / (2π · η)','tm'));},
+inertia:v=>{const D0=v.D>0?v.D:1,ri=cl(v.di/D0,0,0.95)*55,Lw=cl(v.L/D0*110,6,95);
+  return sv(360,195,C(100,90,55,'fm')+(ri>0?C(100,90,ri,'bg'):'')+L(35,90,165,90,'c')+L(100,25,100,155,'c')+AP('M168,90A68 68 0 0 1 100,158')+T(150,150,'n','ta','start')
+   +(ri>0?T(100,84,'d₁','tm'):'')+DX(45,155,176,'D',90)+R(230,35,Lw,110,'fm')+L(220,90,240+Lw,90,'c')+DX(230,230+Lw,176,'L',145)+T(10,18,'J：慣性モーメント','tm','start')+T(230+Lw/2,24,'側面','tm'));},
+lever:v=>{const th=cl(v.th,5,175)*PI/180,ex=270,ey=100,dx=Math.cos(th),dy=Math.sin(th),tx=ex-70*dx,ty=ey-70*dy,inv=v.mode==='t2f';
+  let s=R(70,95,200,10,'fm')+C(70,100,10,'f')+C(70,100,3,'s')+A(tx,ty,ex,ey);
+  if(Math.abs(dx)>0.02)s+=L(ex,ey-70*dy,ex,ey,'dfl')+T(ex+6,ey-40*dy,'F·sinθ','tm','start');
+  s+=P(`M${ex-24},${ey}A24 24 0 0 1 ${n1(ex-24*dx)},${n1(ey-24*dy)}`,'d')+T(ex-38*Math.cos(th/2),ey-38*Math.sin(th/2)+4,'θ','tm');
+  s+=T(tx-6,ty-4,inv?'F（求める）':'F','ta','end')+AP('M42,100A28 28 0 0 1 70,72')+T(70,62,inv?'T（抵抗トルク）':'T（求める）','ta')+DX(70,270,140,'L',110);
+  return sv(360,160,s);},
+loadtq:v=>{const up=!(v.N2<v.N1),y1=up?195:155,y2=up?155:195;
+  return sv(380,240,R(20,35,70,50,'fm')+T(55,64,'モータ','')+L(90,60,120,60,'pp')+R(120,40,70,40,'f')+T(155,64,'減速機 i','')+L(190,60,230,60,'pp')+R(230,20,16,80,'fm')+T(256,50,'負荷 J','ta','start')
+   +T(55,104,'モータ軸','tm')+T(55,120,'T, N×i','ta')+T(238,118,'負荷軸','tm')+T(238,134,'T_L, N','ta')
+   +AX(60,212,60,140)+AX(55,205,345,205)+P(`M60,${y1}L110,${y1}L230,${y2}L330,${y2}`,'s')+L(230,y2,230,205,'hid')+L(110,y1,110,205,'hid')
+   +T(54,y1+4,'N₁','tm','end')+T(280,y2-6,'N₂','tm')+DX(110,230,222,'Δt',205)+T(66,146,'回転数','tm','start')+T(345,198,'時間','tm','end'));},
+stop:v=>sv(380,150,GND(20,110,315)+WALL(335,40,70,1)+R(60,60,80,50,'fm')+T(100,90,'m','')+A(70,45,140,45)+T(105,38,'v','ta')+R(270,72,65,22,'f')+L(230,83,270,83,'pp')+R(222,73,8,20,'fm')
+  +DX(222,262,58,'s',73)+A(218,100,145,100)+T(182,96,'F','ta')+T(296,62,'緩衝器','tm')),
+fall:v=>sv(300,205,R(110,15,50,35,'fm')+T(135,37,'m','')+L(135,50,135,180,'hid')+GND(60,185,150)+DY(50,185,88,'h',110)+A(180,135,180,178)+T(188,160,'v','ta','start')+T(230,40,'E = m·g·h','tm')),
+cent:v=>sv(320,205,C(110,100,100,'hid')+C(110,100,4,'f')+D(110,100,196,100,'r',0,-6)+C(210,100,12,'fm')+A(224,100,292,100)+T(270,92,'F','ta')+AP('M160,13.4A100 100 0 0 1 206.6,74.1')+T(200,34,'n','ta','start'))
+};})();
+
+/* ---------- records ---------- */
+let lastOut=null,clrTimer=null;
+const recs=id=>{const r=store.get('rec:'+(id||cur.id));return Array.isArray(r)?r:[];};
+const isErr=o=>!o||o.r.some(x=>x.k==='入力エラー');
+function recVal(x){return x.t!=null?esc(x.t):fmt(x.v);}
+function recMsg(t){$('#recmsg').textContent=t;}
+function renderRecs(){
+  const list=recs(),ul=$('#reclist');
+  $('#reccount').textContent=list.length?list.length+' 件':'';
+  $('#recclr').disabled=$('#reccopy').disabled=!list.length;
+  $('#recname').placeholder='名前（空欄なら「記録 '+(list.length+1)+'」）';
+  disarm();$('#recfb').hidden=true;
+  if(!list.length){ul.innerHTML='<li class="rec-empty">まだ記録はありません。名前（例：タンク1）を入れて「記録する」を押すと、今の入力と結果がここに並びます。</li>';return;}
+  const pad=n=>String(n).padStart(2,'0');
+  ul.innerHTML=list.map((r,i)=>{const d=new Date(r.ts);
+    const mains=r.res.filter(x=>x.m);
+    return '<li class="rec"><div class="rec-top"><span class="rec-n">'+esc(r.n)+'</span><span class="rec-t">'+(d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes())+'</span>'
+     +'<button type="button" class="x" data-i="'+i+'" aria-label="'+esc(r.n)+'を削除" title="この記録を削除">×</button></div>'
+     +'<div class="rec-m">'+mains.map(x=>'<span><span class="k">'+esc(x.k)+'</span> <b>'+recVal(x)+'</b> <span class="k">'+esc(x.u)+'</span>'+(x.st?'<span class="chip '+x.st+'">'+ST[x.st]+'</span>':'')+'</span>').join('')+'</div>'
+     +'<details><summary>入力と全結果</summary><dl class="rec-d"><dt class="sep">入力</dt>'
+     +r.inp.map(([l,val,u])=>'<dt>'+esc(l)+'</dt><dd>'+esc(val)+(u?' '+esc(u):'')+'</dd>').join('')
+     +'<dt class="sep">結果</dt>'+r.res.map(x=>'<dt>'+esc(x.k)+'</dt><dd>'+recVal(x)+(x.u?' '+esc(x.u):'')+'</dd>').join('')+'</dl></details></li>';}).join('');
+}
+function addRec(){
+  if(isErr(lastOut)){recMsg('入力エラーがあるため記録できません。入力値を確認してください。');return;}
+  const list=recs(),nm=$('#recname').value.trim()||('記録 '+(list.length+1));
+  const inp=fields.filter(f=>!f.wrap.hidden).map(f=>[f.lab.textContent,f.inp.opt?(f.el.options[f.el.selectedIndex]||{}).text||f.el.value:f.el.value,f.inp.u||'']);
+  const res=lastOut.r.map(x=>({k:x.k,v:typeof x.v==='number'&&isFinite(x.v)?x.v:null,t:x.t!==undefined?x.t:null,u:x.u||'',st:x.st||'',m:x.main?1:0}));
+  list.push({n:nm,ts:Date.now(),inp,res});store.set('rec:'+cur.id,list);
+  $('#recname').value='';renderRecs();renderNav();recMsg('「'+nm+'」を記録しました。');
+  const ul=$('#reclist');ul.scrollTop=ul.scrollHeight;
+}
+function disarm(){const b=$('#recclr');b.classList.remove('arm');b.textContent='記録を初期化';clearTimeout(clrTimer);}
+function copyRecs(){
+  const list=recs();if(!list.length)return;const cols=['名前','日時'],idx={};
+  const key=(a,u)=>a+(u?' ['+u+']':'');
+  const rows=list.map(r=>{const o={'名前':r.n,'日時':new Date(r.ts).toLocaleString('ja-JP')};
+    r.inp.forEach(([l,val,u])=>{o[key(l,u)]=val;});
+    r.res.forEach(x=>{o[key(x.k,x.u)]=x.t!=null?x.t:(x.v==null?'':String(Number(x.v.toPrecision(6))));});
+    Object.keys(o).forEach(k=>{if(!idx[k]&&!cols.includes(k)){idx[k]=1;cols.push(k);}});return o;});
+  const txt=[cols.join('\t')].concat(rows.map(o=>cols.map(c=>o[c]??'').join('\t'))).join('\n');
+  const fb=()=>{const t=$('#recfb');t.value=txt;t.hidden=false;t.focus();t.select();recMsg('自動でコピーできませんでした。下の欄が選択されているので、そのままコピーしてください。');};
+  try{navigator.clipboard.writeText(txt).then(()=>{$('#recfb').hidden=true;recMsg(list.length+' 件をタブ区切りの表としてコピーしました。Excel に貼り付けられます。');},fb);}catch(e){fb();}
+}
+$('#recadd').onclick=addRec;
+$('#recname').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addRec();}});
+$('#reccopy').onclick=copyRecs;
+$('#recclr').onclick=()=>{const b=$('#recclr');
+  if(b.classList.contains('arm')){store.del('rec:'+cur.id);renderRecs();renderNav();recMsg('この計算の記録をすべて消去しました。');return;}
+  b.classList.add('arm');b.textContent='もう一度押すと全件消去';clearTimeout(clrTimer);clrTimer=setTimeout(disarm,4000);};
+$('#reclist').addEventListener('click',e=>{const b=e.target.closest('.x');if(!b)return;
+  const list=recs(),i=+b.dataset.i,r=list[i];if(!r)return;list.splice(i,1);store.set('rec:'+cur.id,list);renderRecs();renderNav();recMsg('「'+r.n+'」を削除しました。');});
+
+/* ---------- contour views (beam / shaft) ---------- */
+const VZ_BG='#101a2b',VZ_TX='#dbe3ee',VZ_MU='#8d9bb0',VZ_LD='#f2c94c',VZ_SUP='#a7b6ca';
+const RAINBOW=[[58,79,224],[79,195,232],[87,201,154],[242,214,90],[232,88,74]];
+const DIVERGE=[[52,104,240],[140,180,246],[226,232,240],[246,158,118],[226,66,56]];
+function cmap(st,t){t=Math.min(1,Math.max(0,isFinite(t)?t:0));const n=st.length-1,i=Math.min(n-1,Math.floor(t*n)),f=t*n-i,a=st[i],b=st[i+1];return 'rgb('+a.map((v,k)=>Math.round(v+(b[k]-v)*f)).join(',')+')';}
+function grad(c,x1,x2,st){const g=c.createLinearGradient(x1,0,x2,0);st.forEach((s,i)=>g.addColorStop(i/(st.length-1),'rgb('+s.join(',')+')'));return g;}
+function beamFns(bc,F,L,EI){const w=F/L,u=x=>Math.min(x,L-x);const B={
+  cp:[x=>F*x*x*(3*L-x)/6,x=>-F*(L-x)],
+  cw:[x=>w*x*x*(6*L*L-4*L*x+x*x)/24,x=>-w*(L-x)**2/2],
+  sp:[x=>F*u(x)*(3*L*L-4*u(x)**2)/48,x=>F*u(x)/2],
+  sw:[x=>w*x*(L**3-2*L*x*x+x**3)/24,x=>w*x*(L-x)/2],
+  fp:[x=>F*u(x)**2*(3*L-4*u(x))/48,x=>F*(4*u(x)-L)/8],
+  fw:[x=>w*x*x*(L-x)**2/24,x=>w*(6*L*x-6*x*x-L*L)/12]}[bc];
+  return{y:x=>B[0](x)/EI,M:B[1]};}
+function cvSetup(cv){const W=Math.max(260,cv.parentNode.clientWidth),H=Math.round(Math.min(400,Math.max(300,W*0.66))),dpr=window.devicePixelRatio||1;
+  cv.style.height=H+'px';cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);
+  c.fillStyle=VZ_BG;c.fillRect(0,0,W,H);c.textBaseline='alphabetic';return{W,H,c};}
+const vfont=(c,px,wt)=>{c.font=(wt||500)+' '+px+'px "IBM Plex Sans JP",system-ui,-apple-system,"Hiragino Sans",sans-serif';};
+function vtext(c,s,x,y,col,al,px,wt){vfont(c,px||13,wt);c.fillStyle=col||VZ_TX;c.textAlign=al||'left';c.fillText(s,x,y);}
+function varrow(c,x1,y1,x2,y2,col,lw){const a=Math.atan2(y2-y1,x2-x1),h=8;c.strokeStyle=c.fillStyle=col;c.lineWidth=lw||2.5;c.beginPath();c.moveTo(x1,y1);c.lineTo(x2-Math.cos(a)*h*0.6,y2-Math.sin(a)*h*0.6);c.stroke();
+  c.beginPath();c.moveTo(x2,y2);c.lineTo(x2-h*Math.cos(a-0.45),y2-h*Math.sin(a-0.45));c.lineTo(x2-h*Math.cos(a+0.45),y2-h*Math.sin(a+0.45));c.closePath();c.fill();}
+function vhead(c,W,l1,l2,dash){vtext(c,l1,16,26,VZ_TX,'left',13.5,600);if(l2){vtext(c,l2,16,46,VZ_MU,'left',12);}
+  if(dash){vfont(c,12);const x=16+c.measureText(l2||'').width+16;c.strokeStyle=VZ_MU;c.lineWidth=1;c.setLineDash([5,4]);c.beginPath();c.moveTo(x,42);c.lineTo(x+26,42);c.stroke();c.setLineDash([]);vtext(c,'変形前',x+32,46,VZ_MU,'left',12);}}
+function vlegend(c,W,H,st,lo,hi,mid){const narrow=W<380,x1=W*(narrow?0.27:0.24),x2=W*(narrow?0.73:0.76),y=H-30;
+  c.fillStyle=grad(c,x1,x2,st);c.beginPath();if(c.roundRect)c.roundRect(x1,y-6,x2-x1,11,5);else c.rect(x1,y-6,x2-x1,11);c.fill();
+  const px=narrow?11.5:12.5;vtext(c,lo,x1-8,y+4,VZ_TX,'right',px);vtext(c,hi,x2+8,y+4,VZ_TX,'left',px);if(mid)vtext(c,mid,(x1+x2)/2,y+22,VZ_MU,'center',11);}
+function vmark(c,x,y){c.fillStyle='#fff';c.beginPath();c.arc(x,y,5,0,7);c.fill();}
+function vlabel(c,W,s,x,y){vfont(c,13.5,600);const w=c.measureText(s).width;x=Math.min(W-12-w/2,Math.max(12+w/2,x));
+  c.fillStyle='rgba(16,26,43,.78)';c.fillRect(x-w/2-6,y-15,w+12,21);vtext(c,s,x,y,'#fff','center',13.5,600);}
+function vaxis(c,W,H,x0,x1,L){const y=H-64;c.strokeStyle=VZ_MU;c.lineWidth=1;c.beginPath();c.moveTo(x0,y-14);c.lineTo(x0,y-6);c.moveTo(x1,y-14);c.lineTo(x1,y-6);c.stroke();
+  vtext(c,'0',x0,y+8,VZ_MU,'center',12.5);vtext(c,fmtPlain(L)+' mm',x1,y+8,VZ_MU,'center',12.5);}
+function vwall(c,x,yc,h,dir){c.strokeStyle=VZ_SUP;c.lineWidth=2;c.beginPath();c.moveTo(x,yc-h);c.lineTo(x,yc+h);c.stroke();c.lineWidth=1.5;c.beginPath();
+  for(let y=yc-h;y<yc+h-2;y+=9){c.moveTo(x,y+9);c.lineTo(x+dir*9,y);}c.stroke();}
+function vpin(c,x,y,roll){c.strokeStyle=VZ_SUP;c.lineWidth=1.8;c.beginPath();c.moveTo(x,y);c.lineTo(x-12,y+20);c.lineTo(x+12,y+20);c.closePath();c.stroke();
+  let g=y+20;if(roll){c.beginPath();c.arc(x-6,y+25,4.5,0,7);c.moveTo(x+10.5,y+25);c.arc(x+6,y+25,4.5,0,7);c.stroke();g=y+30;}
+  c.beginPath();c.moveTo(x-17,g+1);c.lineTo(x+17,g+1);c.stroke();}
+
+function drawBeam(cv,d,mode){
+  const {W,H,c}=cvSetup(cv),L=d.L,f=beamFns(d.bc,d.F,L,d.EI),N=180;
+  const cant=/^c/.test(d.bc),fix=/^f/.test(d.bc),dist=/w$/.test(d.bc);
+  const pl=Math.max(46,W*0.11),pr=pl,bl=W-pl-pr,th=Math.max(13,Math.min(22,W*0.04)),tH=H*0.14,y0=Math.max(H*0.40,64+tH+th/2+16);
+  let ym=0,xm=0,mm=0,xs=0;for(let i=0;i<=N;i++){const x=L*i/N,a=Math.abs(f.y(x)),b=Math.abs(f.M(x));if(a>ym+1e-12){ym=a;xm=x;}if(b>mm+1e-9){mm=b;xs=x;}}
+  if(!(ym>0)||!(mm>0))return;
+  const ppm=bl/L,s=H*0.13/ym,amp=s/ppm,smax=mm/d.Z;
+  const X=x=>pl+x/L*bl,Y=x=>y0+s*f.y(x),lowY=y0+H*0.13+th/2+(cant||fix?30:44);
+  const P=[];for(let i=0;i<=N;i++){const x=L*i/N,e=L/N/2,sl=(Y(Math.min(L,x+e))-Y(Math.max(0,x-e)))/(X(Math.min(L,x+e))-X(Math.max(0,x-e))),k=1/Math.sqrt(1+sl*sl);P.push({x,px:X(x),py:Y(x),nx:-sl*k,ny:k});}
+  const stress=mode==='s';
+  vhead(c,W,stress?'曲げ応力 σ [MPa]（下面＋引張 / 上面−圧縮）':'変位 |δ| [mm]','表示倍率 ×'+fmtPlain(amp),true);
+  c.strokeStyle=VZ_MU;c.lineWidth=1;c.setLineDash([6,6]);c.beginPath();c.moveTo(X(0),y0);c.lineTo(X(L),y0);c.stroke();c.setLineDash([]);
+  const quad=(a,b,e1,e2,col)=>{c.fillStyle=c.strokeStyle=col;c.lineWidth=0.7;c.beginPath();
+    c.moveTo(a.px+a.nx*e1,a.py+a.ny*e1);c.lineTo(b.px+b.nx*e1,b.py+b.ny*e1);c.lineTo(b.px+b.nx*e2,b.py+b.ny*e2);c.lineTo(a.px+a.nx*e2,a.py+a.ny*e2);c.closePath();c.fill();c.stroke();};
+  const K=14;
+  for(let i=0;i<N;i++){const a=P[i],b=P[i+1],xm2=(a.x+b.x)/2;
+    if(!stress)quad(a,b,-th/2,th/2,cmap(RAINBOW,Math.abs(f.y(xm2))/ym));
+    else{const M=f.M(xm2);for(let k=0;k<K;k++){const e1=-th/2+th*k/K,e2=-th/2+th*(k+1)/K,eta=((k+0.5)/K)*2-1;quad(a,b,e1,e2,cmap(DIVERGE,0.5+0.5*(M*eta/d.Z)/smax));}}}
+  // supports
+  if(cant)vwall(c,X(0)-1,y0,th*1.9,-1);else if(fix){vwall(c,X(0)-1,y0,th*1.9,-1);vwall(c,X(L)+1,y0,th*1.9,1);}else{vpin(c,X(0),y0+th/2+1,false);vpin(c,X(L),y0+th/2+1,true);}
+  // loads
+  const tail=y0-th/2-tH;
+  if(dist){const n=Math.max(6,Math.round(bl/34));c.strokeStyle=VZ_LD;c.lineWidth=2;c.beginPath();c.moveTo(X(0),tail);c.lineTo(X(L),tail);c.stroke();
+    for(let i=0;i<=n;i++){const x=L*(0.02+0.96*i/n);varrow(c,X(x),tail,X(x),Y(x)-th/2-3,VZ_LD,1.8);}vtext(c,'W = '+fmtPlain(d.F)+' N（総荷重）',X(L/2),tail-8,VZ_LD,'center',12.5,600);}
+  else{const xp=cant?L:L/2;varrow(c,X(xp),tail-8,X(xp),Y(xp)-th/2-3,VZ_LD,2.5);vtext(c,'F = '+fmtPlain(d.F)+' N',X(xp)+(cant?-10:10),tail+4,VZ_LD,cant?'right':'left',12.5,600);}
+  // max marker
+  if(!stress){vmark(c,X(xm),Y(xm));vlabel(c,W,'最大 '+fmtPlain(ym)+' mm',X(xm),lowY);}
+  else{const M=f.M(xs),eta=M>0?1:-1,pt=P.reduce((p,q)=>Math.abs(q.x-xs)<Math.abs(p.x-xs)?q:p);vmark(c,pt.px+pt.nx*eta*th/2,pt.py+pt.ny*eta*th/2);
+    vlabel(c,W,'最大 σ '+fmtPlain(smax)+' MPa（'+(M>0?'下面・引張':'上面・引張')+'）',pt.px,lowY);}
+  vaxis(c,W,H,X(0),X(L),L);
+  if(!stress)vlegend(c,W,H,RAINBOW,'0 mm',fmtPlain(ym)+' mm');
+  else vlegend(c,W,H,DIVERGE,'−'+fmtPlain(smax),'+'+fmtPlain(smax)+' MPa','圧縮　　　0　　　引張');
+}
+function drawShaft(cv,d,mode){
+  const {W,H,c}=cvSetup(cv);
+  if(mode==='tau'){const cx=W/2,cy=H*0.43,R=Math.min(W*0.2,H*0.21),ri=d.di>0?R*d.di/d.d:0;
+    vhead(c,W,'せん断応力 τ [MPa]（断面）','τ = T · r / Ip　中心で 0、外周で最大',false);
+    for(let k=90;k>=0;k--){const r=ri+(R-ri)*k/90;c.fillStyle=cmap(RAINBOW,r/R);c.beginPath();c.arc(cx,cy,r,0,7);c.fill();}
+    if(ri>0){c.fillStyle=VZ_BG;c.beginPath();c.arc(cx,cy,ri,0,7);c.fill();}
+    c.strokeStyle=VZ_SUP;c.lineWidth=1.5;c.beginPath();c.arc(cx,cy,R,0,7);c.stroke();if(ri>0){c.beginPath();c.arc(cx,cy,ri,0,7);c.stroke();}
+    c.strokeStyle=VZ_LD;c.fillStyle=VZ_LD;c.lineWidth=2;for(let i=0;i<8;i++){const a0=i*Math.PI/4+0.15,a1=a0+0.42,rr=R+13;c.beginPath();c.arc(cx,cy,rr,a0,a1);c.stroke();
+      const ex=cx+rr*Math.cos(a1),ey=cy+rr*Math.sin(a1),tx=-Math.sin(a1),ty=Math.cos(a1);c.beginPath();c.moveTo(ex+tx*6,ey+ty*6);c.lineTo(ex-ty*4,ey+tx*4);c.lineTo(ex+ty*4,ey-tx*4);c.closePath();c.fill();}
+    vtext(c,'T = '+fmtPlain(d.T)+' N·m',cx+R+22,cy-R-4,VZ_LD,'left',12.5,600);
+    vmark(c,cx+R*Math.cos(-0.5),cy+R*Math.sin(-0.5));
+    vlabel(c,W,'最大 τ '+fmtPlain(d.tau)+' MPa（外周）',cx,cy+R+38);
+    if(ri>0)vtext(c,'内周 '+fmtPlain(d.tau*d.di/d.d)+' MPa',cx,cy+4,VZ_TX,'center',12);
+    vlegend(c,W,H,RAINBOW,'0 MPa',fmtPlain(d.tau)+' MPa');return;}
+  const pl=Math.max(50,W*0.12),pr=Math.max(46,W*0.11),bl=W-pl-pr,cy=H*0.46,R=Math.min(H*0.12,36),th=d.th,k=th>0?(70/th):0,N=140;
+  const X=x=>pl+x/d.L*bl;
+  vhead(c,W,'ねじれ角 θ [°]（左端固定・右端にトルク）','表示倍率 ×'+fmtPlain(k),true);
+  for(let i=0;i<N;i++){c.fillStyle=cmap(RAINBOW,(i+0.5)/N);c.fillRect(X(d.L*i/N),cy-R,bl/N+0.8,2*R);}
+  const g=c.createLinearGradient(0,cy-R,0,cy+R);g.addColorStop(0,'rgba(255,255,255,.28)');g.addColorStop(0.35,'rgba(255,255,255,0)');g.addColorStop(1,'rgba(0,0,0,.35)');c.fillStyle=g;c.fillRect(X(0),cy-R,bl,2*R);
+  c.strokeStyle=VZ_MU;c.lineWidth=1;c.setLineDash([6,6]);c.beginPath();c.moveTo(X(0),cy);c.lineTo(X(d.L),cy);c.stroke();c.setLineDash([]);
+  c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=1.3;
+  for(const p0 of [-60,-30,0,30,60]){c.beginPath();let on=false;for(let i=0;i<=N;i++){const x=d.L*i/N,a=(p0+k*th*x/d.L)*Math.PI/180;
+      if(Math.cos(a)>0.05){const px=X(x),py=cy-R*Math.sin(a);if(on)c.lineTo(px,py);else{c.moveTo(px,py);on=true;}}else on=false;}c.stroke();}
+  c.strokeStyle=VZ_SUP;c.lineWidth=1.5;c.strokeRect(X(0),cy-R,bl,2*R);
+  vwall(c,X(0)-1,cy,R+16,-1);
+  const ex=X(d.L)-10;c.strokeStyle=VZ_LD;c.lineWidth=2.5;c.beginPath();c.ellipse(ex,cy,11,R+14,0,-Math.PI/2,Math.PI*0.75);c.stroke();
+  {const a=Math.PI*0.75,px=ex+11*Math.cos(a),py=cy+(R+14)*Math.sin(a);varrow(c,px+6,py-2,px-1,py+3,VZ_LD,2.5);}
+  vtext(c,'T = '+fmtPlain(d.T)+' N·m',X(d.L),cy-R-24,VZ_LD,'right',12.5,600);
+  vmark(c,X(d.L),cy);vlabel(c,W,'最大 θ '+fmtPlain(th)+'°（右端）',X(d.L)-30,cy+R+40);
+  vaxis(c,W,H,X(0),X(d.L),d.L);vlegend(c,W,H,RAINBOW,'0°',fmtPlain(th)+'°');
+}
+const VIZ={beam:{modes:[['d','変位'],['s','曲げ応力']],draw:drawBeam,note:{d:'色はその位置のたわみ量です。形は表示倍率で誇張しています（自重は含みません）。',s:'はりの上下で応力が逆向きになり、中立軸（中央）で 0 になります。'}},
+  shaft:{modes:[['t','ねじれ角'],['tau','せん断応力']],draw:drawShaft,note:{t:'白い線はもとは真っすぐな表面の線です。ねじれの様子を誇張して表示しています。',tau:'中実軸は中心で 0、外周で最大になります。'}}};
+let curViz=null;
+function vizMode(){const V=VIZ[curViz.t];const m=store.get('vz:'+cur.id);return V.modes.some(x=>x[0]===m)?m:V.modes[0][0];}
+function drawViz(){if(!curViz)return;const V=VIZ[curViz.t],m=vizMode();
+  $('#vizseg').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===m)));
+  $('#viznote').textContent=V.note[m]||'';try{V.draw($('#vizcv'),curViz,m);}catch(e){}}
+function showViz(vz){const box=$('#viz');curViz=vz||null;box.hidden=!vz;if(!vz)return;const V=VIZ[vz.t],seg=$('#vizseg');
+  if(seg.dataset.t!==vz.t){seg.dataset.t=vz.t;seg.innerHTML=V.modes.map(([k,n])=>'<button type="button" data-m="'+k+'">'+n+'</button>').join('');}
+  requestAnimationFrame(drawViz);}
+$('#vizseg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;store.set('vz:'+cur.id,b.dataset.m);drawViz();});
+try{new ResizeObserver(()=>{if(curViz&&!$('#viz').hidden)drawViz();}).observe($('#viz'));}catch(e){window.addEventListener('resize',()=>drawViz());}
+
+$('#q').addEventListener('input',renderNav);
+$('#pick').addEventListener('change',e=>{go(e.target.value);try{$('.chead').scrollIntoView({block:'start'})}catch(_){}});
+$('#reset').onclick=()=>{store.del('in:'+cur.id);openCalc(cur.id,true);};
+$('#count').textContent=CALCS.length+' 種';
+
+const h=(location.hash||'').slice(1);
+const start=CALCS.find(x=>x.id===h)?h:(store.get('last')||'mass');
+openCalc(CALCS.find(x=>x.id===start)?start:'mass');
+})();
+</script>
+<script>
+if('serviceWorker' in navigator && /^https?:/.test(location.protocol)){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
+}
+</script>
+</body></html>
